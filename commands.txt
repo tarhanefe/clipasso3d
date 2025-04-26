@@ -1,0 +1,18 @@
+To get GPU from the cluster: 
+srun --gres=gpu:2 --cpus-per-task=4 --mem=16G --time=12:00:00 --pty bash
+
+To reach different directories:
+cd /home/tarhan
+cd /scratch/tarhan
+
+
+For the envorinment:
+# 1. Create a conda environment
+conda create -f environment.yaml
+conda activate clipasso3d
+
+# 2. Install the required packages
+pip install torch==2.4.1+cu124 torchvision==0.19.1+cu124 --extra-index-url https://download.pytorch.org/whl/cu124
+pip install ninja
+pip install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
+pip install nerfstudio

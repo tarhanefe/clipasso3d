@@ -1,0 +1,13 @@
+name: clipasso3d
+channels:
+  - defaults
+  - conda-forge
+  - nvidia/label/cuda-11.8.0
+dependencies:
+  - python=3.8
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - pip
+  - cuda-toolkit
