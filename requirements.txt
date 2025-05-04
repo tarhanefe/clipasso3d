@@ -1,0 +1,11 @@
+ftfy
+jupyter
+matplotlib
+numpy
+Pillow
+scipy
+scikit-image
+scikit-learn
+tqdm
+regex
+plotly
