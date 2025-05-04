@@ -51,10 +51,21 @@ clipasso3d/
 ## Demo
 ### A snake
 <p align="center">
-  <img src="assets/training_evolution.gif" width=300px />
+  <img src="assets/snake.gif" width=300px />
 </p>
 
 
 <p align="center">
   <img src="data/snake.jpg" width=300px />
 </p>
+
+### A giraffe
+<p align="center">
+  <img src="assets/giraffe.gif" width=300px />
+</p>
+
+
+<p align="center">
+  <img src="data/giraffe.jpg" width=300px />
+</p>
+
