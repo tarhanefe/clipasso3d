@@ -1,15 +1,11 @@
-<p align="center">
-  <img src="assets/epfl.png" width="%40" />
-</p>
-
 # From Pixels to Wireframes: 3D Reconstruction via CLIP-Based Sketch Abstraction
+
+<p align="center">
+  <img src="assets/pipeline.png" width=700px />
+</p>
 
 This repository contains the project proposal and pseudocode for “From Pixels to Wireframes,” a method for generating **3D sketch abstractions** using CLIP-based losses and Bézier curves on reconstructed surfaces.
 
-
-<p align="center">
-  <img src="assets/pipeline.png" width="%50" />
-</p>
 ---
 
 ## Project Structure
@@ -67,12 +63,12 @@ clipasso3d/
 ---
 
 ## Demo
-
+### A snake
 <p align="center">
-  <img src="assets/training_evolution.gif" width="%50" />
+  <img src="assets/training_evolution.gif" width=300px />
 </p>
 
 
 <p align="center">
-  <img src="data/snake.jpg" width="%50" />
+  <img src="data/snake.jpg" width=300px />
 </p>
