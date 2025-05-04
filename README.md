@@ -2,30 +2,35 @@
 
 This repository contains the project proposal and pseudocode for “From Pixels to Wireframes,” a method for generating **3D sketch abstractions** using CLIP-based losses and Bézier curves on reconstructed surfaces.
 
-## Table of Contents
-
-- [Project Structure](#project-structure)  
-- [Prerequisites](#prerequisites)  
-- [Setup & Installation](#setup--installation)  
+![Pipeline](assets/pipeline.png)
 ---
 
 ## Project Structure
 
 ```
-.
-├── pipeline.png              # Pipeline illustration
-├── literature.bib            # Bibliography file
-├── main.tex                  # LaTeX source (proposal)
-├── appendices.tex            # Appendix with pseudocode
-├── figures/
-│   └── ...                   # Any additional figures
-└── README.md                 # ← You are here
+clipasso3d/
+├── CLIP_/                    
+├── data/
+│   ├── snake.jpg
+│   ├── test.jpeg
+│   ├── test.png
+│   └── transforms_train.json
+├── notebooks/
+│   ├── 2DCLIPSetting.ipynb
+│   ├── CLIPLoss.ipynb
+│   ├── GaussianRender.ipynb
+│   └── training_evolution.gif
+├── source/
+│   ├── __pycache__/
+│   ├── beziercurve.py
+│   ├── cliploss.py
+│   ├── diffrasterizer.py
+│   └── utils.py
+├── .gitignore
+├── .gitmodules
+├── README.md
+└── requirements.txt
 ```
-
-- **main.tex** — the core proposal document (title, abstract, introduction, method, related work, discussion).  
-- **appendices.tex** — contains the pseudocode (App. A).  
-- **literature.bib** — bibliography entries for all cited works.  
-- **pipeline.png** — high-level overview of the pipeline.  
 
 
 ---
@@ -52,41 +57,9 @@ This repository contains the project proposal and pseudocode for “From Pixels 
    ```bash
    pip install -r requirements.txt
    ```
-
 ---
 
-## Usage
+## Demo
 
-- **Read the PDF**  
-  ```bash
-  xdg-open main.pdf   # Linux
-  open main.pdf       # macOS
-  start main.pdf      # Windows
-  ```
-
-- **Edit content**  
-  - Modify sections in `main.tex`.  
-  - Update pseudocode in `appendices.tex`.  
-  - Add new figures under `figures/` and include them with `\includegraphics`.  
-
-- **Add / Update references**  
-  - Edit `literature.bib`  
-  - Run `bibtex` or let `latexmk` handle it automatically.
-
----
-
-## Contributing
-
-Feel free to open issues or pull requests to:
-
-- Refine the write-up  
-- Update pseudocode or figures  
-- Improve formatting or styling  
-
-Please follow standard IEEE Tran `.bib` formatting for references.
-
----
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+![Training Evolution](assets/training_evolution.gif)
+![Training Evolution](data/snake.jpg)
