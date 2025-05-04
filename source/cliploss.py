@@ -1,4 +1,7 @@
 import collections
+import os
+import sys
+sys.path.append("../")
 import CLIP_.clip as clip
 import torch
 import torch.nn as nn
