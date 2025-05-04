@@ -7,11 +7,6 @@ This repository contains the project proposal and pseudocode for “From Pixels 
 - [Project Structure](#project-structure)  
 - [Prerequisites](#prerequisites)  
 - [Setup & Installation](#setup--installation)  
-- [Building the PDF](#building-the-pdf)  
-- [Usage](#usage)  
-- [Contributing](#contributing)  
-- [License](#license)  
-
 ---
 
 ## Project Structure
@@ -32,65 +27,16 @@ This repository contains the project proposal and pseudocode for “From Pixels 
 - **literature.bib** — bibliography entries for all cited works.  
 - **pipeline.png** — high-level overview of the pipeline.  
 
----
-
-## Prerequisites
-
-- A modern **TeX distribution** (e.g., TeX Live 2023 or later, MiKTeX)  
-- `latexmk` (for automated compilation)  
-- `git` (to clone the repo)  
-
-Optionally, you can build inside Docker or GitHub Codespaces if you prefer an isolated environment.
 
 ---
 
 ## Setup & Installation
 
-1. **Clone the repository:**
+**Clone the repository:**
    ```bash
-   git clone https://github.com/<your-username>/3d-sketch-abstraction.git
-   cd 3d-sketch-abstraction
+   git clone https://github.com/tarhanefe/clipasso3d.git
+   cd clipasso3d
    ```
-
-2. **Install TeX dependencies** (if not already installed):
-   ```bash
-   # On Ubuntu / Debian
-   sudo apt update
-   sudo apt install -y texlive-full latexmk
-   ```
-
-3. **(Optional) Docker-based build**  
-   If you don’t want to install TeX locally, use our provided Dockerfile:
-   ```bash
-   docker build -t 3d-sketch-latex .
-   docker run --rm -v "$PWD":/workspace -w /workspace 3d-sketch-latex      latexmk -pdf -interaction=nonstopmode main.tex
-   ```
-
-4. **(Optional) GitHub Codespaces**  
-   Open this folder in GitHub Codespaces and it will automatically install TeX Live and `latexmk`.  
-
----
-
-## Building the PDF
-
-Once prerequisites are met, build your PDF with:
-
-```bash
-# Automatic rebuild on changes:
-latexmk -pdf -interaction=nonstopmode   -file-line-error -halt-on-error main.tex
-```
-
-Or, for a one-shot compile:
-
-```bash
-pdflatex main.tex
-bibtex main
-pdflatex main.tex
-pdflatex main.tex
-```
-
-The final PDF will be generated as `main.pdf`.
-
 ---
 
 ## Usage
