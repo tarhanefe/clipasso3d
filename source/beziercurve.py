@@ -49,7 +49,7 @@ class BezierCurve(nn.Module):
         coefs = self.binoms * t_pow * one_pow  # (K, N)
         return coefs @ self.P                     # (K,3)
 
-    def forward(self) -> (torch.Tensor, torch.Tensor):
+    def forward(self) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Sample along the Bézier curve so that spheres of radius `thickness`
         overlap by `overlap` fraction.
