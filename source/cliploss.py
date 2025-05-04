@@ -76,7 +76,7 @@ class Loss(nn.Module):
             # loss = loss + losses_dict[key] * loss_coeffs[key]
             losses_dict[key] = losses_dict[key] * loss_coeffs[key]
         # print(losses_dict)
-        return losses_dict
+        return sum(losses_dict.values())
 
 
 class CLIPLoss(torch.nn.Module):
