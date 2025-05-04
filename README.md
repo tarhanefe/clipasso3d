@@ -14,27 +14,13 @@ This repository contains the project proposal and pseudocode for “From Pixels 
 clipasso3d/
 ├── CLIP_/                    
 ├── data/
-│   ├── snake.jpg
-│   ├── test.jpeg
-│   ├── test.png
-│   └── transforms_train.json
 ├── notebooks/
-│   ├── 2DCLIPSetting.ipynb
-│   ├── CLIPLoss.ipynb
-│   ├── GaussianRender.ipynb
-│   └── training_evolution.gif
 ├── source/
-│   ├── __pycache__/
-│   ├── beziercurve.py
-│   ├── cliploss.py
-│   ├── diffrasterizer.py
-│   └── utils.py
 ├── .gitignore
 ├── .gitmodules
 ├── README.md
 └── requirements.txt
 ```
-
 
 ---
 
