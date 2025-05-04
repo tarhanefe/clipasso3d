@@ -37,6 +37,20 @@ This repository contains the project proposal and pseudocode for “From Pixels 
    git clone https://github.com/tarhanefe/clipasso3d.git
    cd clipasso3d
    ```
+
+**Create a new Conda environment with python version 3.10
+   ```bash
+   conda create -n 3dsketch python=3.10 -y
+   conda activate 3dsketch
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+   ```
+**Install library requirements
+   ```bash
+   conda create -n 3dsketch python=3.10 -y
+   conda activate 3dsketch
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+   ```
+
 ---
 
 ## Usage
