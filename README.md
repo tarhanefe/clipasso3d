@@ -69,3 +69,14 @@ clipasso3d/
   <img src="data/giraffe.jpg" width=300px />
 </p>
 
+### A dolphin
+<p align="center">
+  <img src="assets/dolphin.gif" width=300px />
+</p>
+
+
+<p align="center">
+  <img src="data/dolphin.png" width=300px />
+</p>
+
+
