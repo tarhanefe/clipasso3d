@@ -79,4 +79,16 @@ clipasso3d/
   <img src="data/dolphin.png" width=300px />
 </p>
 
+### The plant 
+<p align="center">
+  <img src="assets/tree.gif" width=500px />
+</p>
 
+
+<p align="center">
+  <img src="assets/tree.png" width=300px />
+</p>
+
+<p align="center">
+  <img src="assets/tree_gt.png" width=300px />
+</p>
