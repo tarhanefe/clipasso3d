@@ -8,7 +8,7 @@ This repository contains the project proposal and pseudocode for “From Pixels 
 
 ---
 
-## Project Structure
+# Project Structure
 
 ```
 clipasso3d/
@@ -24,7 +24,7 @@ clipasso3d/
 
 ---
 
-## Setup & Installation
+# Setup & Installation
 
 **Clone the repository:**
    ```bash
@@ -48,7 +48,10 @@ clipasso3d/
    ```
 ---
 
-## Demo
+# Demo
+
+## Single View 3D Generations
+
 ### A snake
 <p align="center">
   <img src="assets/snake.gif" width=300px />
@@ -78,6 +81,8 @@ clipasso3d/
 <p align="center">
   <img src="data/dolphin.png" width=300px />
 </p>
+
+## Multi View 3D Generations
 
 ### The plant 
 <p align="center">
