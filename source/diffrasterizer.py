@@ -2,7 +2,7 @@ import torch
 import math
 from einops import rearrange, repeat
 
-def rasterize_spheres(
+def rasterize_spheres_batched(
     means: torch.Tensor,
     radii_world: float | torch.Tensor,
     viewmat: torch.Tensor,
@@ -78,3 +78,32 @@ def rasterize_spheres(
     alpha = 1 - torch.prod(1 - w + 1e-10, dim=-1)  # (H,W)
 
     return alpha.unsqueeze(-1)  # (B,H,W,1)
+
+def rasterize_spheres(
+    means: torch.Tensor,
+    radii_world: float | torch.Tensor,
+    viewmat: torch.Tensor,
+    K: torch.Tensor,
+    width: int,
+    height: int,
+) -> torch.Tensor:
+    """
+    Rasterize spheres into a single image using Gaussian splatting.
+    Args:
+        means: (N,3) tensor of sphere centers in world space.
+        radii_world: (N,) tensor of sphere radii in world space.
+        viewmat: (4,4) camera-to-world matrix.
+        K: (3,3) camera intrinsics matrix.
+        width: image width.
+        height: image height.
+    Returns:
+        alpha: (H,W,1) tensor of alpha values for each pixel.
+    """
+    return rasterize_spheres_batched(
+        means.unsqueeze(0),
+        radii_world.unsqueeze(0),
+        viewmat.unsqueeze(0),
+        K.unsqueeze(0),
+        width,
+        height,
+    ).squeeze(0)

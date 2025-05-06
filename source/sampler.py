@@ -90,6 +90,26 @@ class ImageSampler:
         idx = int(self.schedule[it])
         return self.images[idx], self.K, self.w2c_all[idx]
 
+    def random_batch(self, batch_size: int):
+        """
+        Sample a batch of images, camera intrinsics, and camera-to-world matrices.
+        Args:
+            - batch_size: number of images to sample.
+        Returns:
+            - images: (batch_size,3,H,W) tensor of images.
+            - K:      (3,3) camera intrinsics matrix.
+            - w2c:    (batch_size,4,4) camera-to-world matrices.
+        """
+
+        # generate batch_size unique random indices
+        indices = torch.randperm(len(self.images), device=self.device)[:batch_size]
+
+        images = torch.cat([self.images[i] for i in indices], dim=0)  # (batch_size,3,H,W)
+        K = self.K
+        w2c = self.w2c_all[indices]
+
+        return images, K, w2c
+
     def plot_camera_poses(
         self,
         arrow_length: float = 0.5,
