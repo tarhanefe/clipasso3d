@@ -28,7 +28,7 @@ clipasso3d/
 
 **Clone the repository:**
    ```bash
-   git clone https://github.com/tarhanefe/clipasso3d.git
+   git clone --recurse--submodules https://github.com/tarhanefe/clipasso3d.git
    cd clipasso3d
    ```
 
