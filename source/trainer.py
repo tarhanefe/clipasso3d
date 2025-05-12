@@ -54,7 +54,7 @@ class Trainer:
         self.display_plots = display_plots
 
         # training schedule
-        self.N_train = len(train_sampler)
+        self.N_train = len(train_sampler) 
         self.updates_per_epoch = math.ceil(self.N_train / self.batch_size)
         self.total_batches = self.updates_per_epoch * self.epochs
 
