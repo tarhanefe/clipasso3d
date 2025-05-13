@@ -180,3 +180,5 @@ cython_debug/
 
 # User definitions 
 .data/
+training_frames
+.vscode/
