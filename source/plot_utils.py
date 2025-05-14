@@ -49,8 +49,7 @@ def plot_spheres(means: np.ndarray, radii: np.ndarray, resolution: int = 20):
 
 def plot_curve_set(
         curve_set: CurveSet,
-        c2w: torch.Tensor,
-        K: torch.Tensor,
+        c2w: torch.Tensor = None,
         resolution: int = 100,
         plot_control_points: bool = False,
     ):
@@ -98,17 +97,18 @@ def plot_curve_set(
         title="Bézier Curve and Control Points"
     )
 
-    # set the camera position
-    position = c2w[:3, 3].cpu().numpy()
-    lookat = c2w[:3, 3].cpu().numpy() - c2w[:3, 2].cpu().numpy()
-    up = c2w[:3, 1].cpu().numpy()
-    fig.update_layout(
-        scene_camera=dict(
-            eye=dict(x=position[0], y=position[1], z=position[2]),
-            center=dict(x=lookat[0], y=lookat[1], z=lookat[2]),
-            up=dict(x=up[0], y=up[1], z=up[2])
+    if c2w is not None:
+        # set the camera position
+        position = c2w[:3, 3].cpu().numpy()
+        lookat = c2w[:3, 3].cpu().numpy() - c2w[:3, 2].cpu().numpy()
+        up = c2w[:3, 1].cpu().numpy()
+        fig.update_layout(
+            scene_camera=dict(
+                eye=dict(x=position[0], y=position[1], z=position[2]),
+                center=dict(x=lookat[0], y=lookat[1], z=lookat[2]),
+                up=dict(x=up[0], y=up[1], z=up[2])
+            )
         )
-    )
 
     # show the plot
     fig.show()
