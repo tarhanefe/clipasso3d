@@ -97,3 +97,14 @@ clipasso3d/
 <p align="center">
   <img src="assets/tree_gt.png" width=300px />
 </p>
+
+
+### The rose 
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/rose_gt.gif" width="250px"><br>Ground Truth Scene</td>
+    <td align="center"><img src="assets/rose_5.gif" width="250px"><br>Model w/ 5 Curves</td>
+    <td align="center"><img src="assets/rose_20.gif" width="250px"><br>Model w/ 20 Curves</td>
+  </tr>
+</table>
