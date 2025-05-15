@@ -53,58 +53,55 @@ clipasso3d/
 ## Single View 3D Generations
 
 ### A snake
-<p align="center">
-  <img src="assets/snake.gif" width=300px />
-</p>
 
 
-<p align="center">
-  <img src="data/snake.jpg" width=300px />
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/snake.gif" width="250px"><br>Evolution of the Model From 1 Viewpoint</td>
+    <td align="center"><img src="data/snake.jpg" width="250px"><br>Original Image</td>
+  </tr>
+</table>
 
 ### A giraffe
-<p align="center">
-  <img src="assets/giraffe.gif" width=300px />
-</p>
 
-
-<p align="center">
-  <img src="data/giraffe.jpg" width=300px />
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/giraffe.gif" width="250px"><br>Evolution of the Model From 1 Viewpoint</td>
+    <td align="center"><img src="data/giraffe.jpg" width="250px"><br>Original Image</td>
+  </tr>
+</table>
 
 ### A dolphin
-<p align="center">
-  <img src="assets/dolphin.gif" width=300px />
-</p>
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/dolphin.gif" width="250px"><br>Evolution of the Model From 1 Viewpoint</td>
+    <td align="center"><img src="data/dolphin.png" width="250px"><br>Original Image</td>
+  </tr>
+</table>
 
 
-<p align="center">
-  <img src="data/dolphin.png" width=300px />
-</p>
 
 ## Multi View 3D Generations
 
 ### The plant 
-<p align="center">
-  <img src="assets/tree.gif" width=500px />
-</p>
 
 
-<p align="center">
-  <img src="assets/tree.png" width=300px />
-</p>
-
-<p align="center">
-  <img src="assets/tree_gt.png" width=300px />
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/tree.gif" width="250px"><br>Training of the Model</td>
+    <td align="center"><img src="assets/tree.png" width="250px"><br>Model w/ 3D Plant Model</td>
+    <td align="center"><img src="assets/tree_gt.png" width="250px"><br>Model w/ Ground Truth Plant</td>
+  </tr>
+</table>
 
 
 ### The rose 
 
 <table align="center">
   <tr>
-    <td align="center"><img src="assets/rose_gt.gif" width="250px"><br>Ground Truth Scene</td>
     <td align="center"><img src="assets/rose_5.gif" width="250px"><br>Model w/ 5 Curves</td>
     <td align="center"><img src="assets/rose_20.gif" width="250px"><br>Model w/ 20 Curves</td>
+    <td align="center"><img src="assets/rose_gt.gif" width="250px"><br>Ground Truth Scene</td>
   </tr>
 </table>
