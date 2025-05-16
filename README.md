@@ -100,9 +100,10 @@ clipasso3d/
 
 <table align="center">
   <tr>
-    <td align="center"><img src="assets/rose_5.gif" width="250px"><br>Model w/ 5 Curves</td>
-    <td align="center"><img src="assets/rose_10.gif" width="250px"><br>Model w/ 10 Curves</td>
-    <td align="center"><img src="assets/rose_20.gif" width="250px"><br>Model w/ 20 Curves</td>
-    <td align="center"><img src="assets/rose_gt.gif" width="250px"><br>Ground Truth Scene</td>
+    <td align="center"><img src="assets/rose_5.gif" width="200px"><br>Model w/ 5 Curves</td>
+    <td align="center"><img src="assets/rose_10.gif" width="200px"><br>Model w/ 10 Curves</td>
+    <td align="center"><img src="assets/rose_15.gif" width="200px"><br>Model w/ 15 Curves</td>
+    <td align="center"><img src="assets/rose_20.gif" width="200px"><br>Model w/ 20 Curves</td>
+    <td align="center"><img src="assets/rose_gt.gif" width="200px"><br>Ground Truth Scene</td>
   </tr>
 </table>
