@@ -18,6 +18,10 @@ pip install ninja
 pip install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 pip install nerfstudio
 
+#For using blender renders:
+pip install opencv-python
+
+
 
 # 3. A different trial 
 

@@ -43,7 +43,6 @@ def load_scene(
     # 3. Collect file paths and camera-to-world matrices
     file_paths: list[str] = []
     c2w_mats: list[torch.Tensor] = []
-
     for frame in meta["frames"]:
         file_paths.append(frame["file_path"])
         mat = torch.tensor(frame["transform_matrix"], dtype=torch.float32, device=device)

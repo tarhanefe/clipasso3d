@@ -86,3 +86,29 @@ class BezierCurve(nn.Module):
                                  dtype=means.dtype,
                                  device=means.device)
         return means, thicknesses
+    
+
+class CurveSet(nn.Module):
+    def __init__(self, init_pts_list, thickness=0.02, overlap=0.8, arc_samples=300, device='cuda'):
+        super().__init__()
+        self.curves = nn.ModuleList([
+            BezierCurve(pts.to(device), thickness, overlap, arc_samples, device=device)
+            for pts in init_pts_list
+        ])
+        self.device = device
+
+    def forward(self):
+        means_list, th_list = [], []
+        for curve in self.curves:
+            m, t = curve()   # (M_i, 3), (M_i,)
+            means_list.append(m)
+            th_list.append(t)
+        means = torch.cat(means_list, dim=0)       # (N,3)
+        thicknesses = torch.cat(th_list, dim=0)    # (N,)
+        return means, thicknesses
+
+    def remove_curve(self, idx):
+        """Remove the curve at index `idx` (0-based)."""
+        if idx < 0 or idx >= len(self.curves):
+            raise IndexError(f"No curve at index {idx}")
+        del self.curves[idx]

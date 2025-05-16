@@ -40,9 +40,12 @@ def rasterize_spheres(
     means2D = proj[:, :2] / proj[:, 2:3]  # (N,2)
 
     # -- 3. Build pixel grid --
-    ys = torch.arange(height, device=device, dtype=dtype)
-    xs = torch.arange(width, device=device, dtype=dtype)
-    yy, xx = torch.meshgrid(ys, xs, indexing='ij')  # (H,W)
+#     ys = torch.arange(height, device=device, dtype=dtype)
+#     xs = torch.arange(width, device=device, dtype=dtype)
+#     yy, xx = torch.meshgrid(ys, xs, indexing='ij')  # (H,W)
+    xs = torch.arange(width-1, -1,    -1, device=device, dtype=dtype)
+    ys = torch.arange(height-1, -1, -1,    device=device, dtype=dtype)
+    yy, xx = torch.meshgrid(ys, xs, indexing='ij')
     pix_x = xx.unsqueeze(-1).unsqueeze(-1)  # (H,W,1,1)
     pix_y = yy.unsqueeze(-1).unsqueeze(-1)  # (H,W,1,1)
 
@@ -63,4 +66,4 @@ def rasterize_spheres(
     w = torch.exp(-0.5 * m2)
     alpha = 1 - torch.prod(1 - w + 1e-10, dim=2)  # (H,W)
 
-    return alpha.unsqueeze(-1)  # (H,W,1)
+    return alpha.unsqueeze(-1) # (H,W,1)
