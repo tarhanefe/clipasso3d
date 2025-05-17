@@ -113,3 +113,15 @@ clipasso3d/
   </tr>
 </table>
 
+
+### The duck 
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/duck_002.gif" width="200px"><br>Model w/ 0.02 Thickness</td>
+    <td align="center"><img src="assets/duck_004.gif" width="200px"><br>Model w/ 0.04 Thickness</td>
+    <td align="center"><img src="assets/duck_gt.gif" width="200px"><br>Ground Truth Scene</td>
+  </tr>
+</table>
+</table>
+
