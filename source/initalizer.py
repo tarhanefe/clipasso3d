@@ -37,9 +37,6 @@ def random_short_lines(center: torch.Tensor,
         lines.append(ctrl_pts)
     return lines
 
-
-    import torch
-
 def initialize_saliency_curves(
     transforms_json: str,
     image_dir: str,
