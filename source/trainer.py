@@ -155,7 +155,7 @@ class Trainer:
                     self.fig.canvas.flush_events()
                     clear_output(wait=True)
                     display(self.fig)
-                else:
+                if self.save_dir:
                     self.fig.savefig(os.path.join(self.save_dir, f"batch_{batch_idx:04d}.png"))
 
                 batch_idx += 1

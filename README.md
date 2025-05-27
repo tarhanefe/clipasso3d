@@ -47,44 +47,20 @@ clipasso3d/
    pip install -r requirements.txt
    ```
 ---
+# How to Use ? 
 
-# Demo
+## 1- Trial Notebook
 
-## Single View 3D Generations
+Use ```WireframeTrial.ipynb```  notebook inside the notebooks folder to interactively examine the training process and obtained results.
 
-### A snake
-
-
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/snake.gif" width="250px"><br>Evolution of the Model From 1 Viewpoint</td>
-    <td align="center"><img src="data/snake.jpg" width="250px"><br>Original Image</td>
-  </tr>
-</table>
-
-### A giraffe
-
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/giraffe.gif" width="250px"><br>Evolution of the Model From 1 Viewpoint</td>
-    <td align="center"><img src="data/giraffe.jpg" width="250px"><br>Original Image</td>
-  </tr>
-</table>
-
-### A dolphin
-
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/dolphin.gif" width="250px"><br>Evolution of the Model From 1 Viewpoint</td>
-    <td align="center"><img src="data/dolphin.png" width="250px"><br>Original Image</td>
-  </tr>
-</table>
+## 2- Run file 
 
 
+---
 
-## Multi View 3D Generations
+## Examples
 
-### The plant 
+#### The plant 
 
 
 <table align="center">
@@ -96,7 +72,7 @@ clipasso3d/
 </table>
 
 
-### The rose 
+#### The rose 
 
 <table align="center">
   <tr>
@@ -114,7 +90,7 @@ clipasso3d/
 </table>
 
 
-### The duck 
+#### The duck 
 
 <table align="center">
   <tr>
