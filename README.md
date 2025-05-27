@@ -81,6 +81,30 @@ Use ```WireframeTrial.ipynb```  notebook inside the notebooks folder to interact
 ```
 where 
 
+### 🔧 Argument Descriptions
+
+| Argument                     | Description                                                                 |
+|-----------------------------|-----------------------------------------------------------------------------|
+| `--data_name`               | Name of dataset folder inside `../data/` (e.g., `rose`).                    |
+| `--save_dir`                | Directory to save per-batch visualization frames.                           |
+| `--output_gif`              | Path to save the training evolution GIF.                                    |
+| `--batch_size`              | Number of images processed per training batch.                              |
+| `--epochs`                  | Number of training epochs.                                                  |
+| `--inner_steps`             | Inner optimization steps per batch.                                         |
+| `--learning_rate`           | Learning rate for Adam optimizer.                                           |
+| `--n_curves`                | Number of Bézier curves initialized in the scene.                           |
+| `--thickness`               | Radius (thickness) of each rendered curve/sphere segment.                   |
+| `--radius`                  | Distance from the scene center to place initial curve points.               |
+| `--length`                  | Length of each curve segment.                                               |
+| `--overlap`                 | Degree of allowed overlap between nearby curves.                            |
+| `--clip_weight`             | Total CLIP loss weight.                                                     |
+| `--clip_conv_loss`          | Weight of the convolutional CLIP loss.                                      |
+| `--clip_fc_loss_weight`     | Weight of CLIP’s final-layer (semantic) similarity loss.                    |
+| `--clip_conv_layer_weights` | Weights for each CLIP convolutional layer (ViT-B/32 has 5 layers).          |
+| `--gif_fps`                 | Frame rate (FPS) of generated GIFs.                                         |
+| `--rotation_time`           | Duration (in seconds) of 3D camera rotation in the fly-around GIF.          |
+| `--revolutions`             | Number of full revolutions in the semihelical fly-around.                   |
+| `--output_semigif`          | Output path for the 3D rendered semihelical GIF animation.                  |
 
 ---
 
