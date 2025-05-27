@@ -55,6 +55,32 @@ Use ```WireframeTrial.ipynb```  notebook inside the notebooks folder to interact
 
 ## 2- Run file 
 
+```bash
+  cd clipasso3d
+  python run.py \
+  --data_name rose \
+  --save_dir training_frames \
+  --output_gif training_evolution.gif \
+  --batch_size 1 \
+  --epochs 10 \
+  --inner_steps 30 \
+  --learning_rate 0.005 \
+  --n_curves 25 \
+  --thickness 0.02 \
+  --radius 0.8 \
+  --length 0.02 \
+  --overlap 0.6 \
+  --clip_weight 1.0 \
+  --clip_conv_loss 1.0 \
+  --clip_fc_loss_weight 0.1 \
+  --clip_conv_layer_weights 0 0 1.0 1.0 0.0 \
+  --gif_fps 120 \
+  --rotation_time 6.0 \
+  --revolutions 3.0 \
+  --output_semigif semihelical.gif
+```
+where 
+
 
 ---
 
