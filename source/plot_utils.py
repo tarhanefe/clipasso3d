@@ -74,7 +74,7 @@ def plot_curve_set(
 
         fig.add_trace(go.Scatter3d(
             x=bezier_pts[:, 0], y=bezier_pts[:, 1], z=bezier_pts[:, 2],
-            mode='lines', line=dict(color='blue', width=5),
+            mode='lines', line=dict(color='black', width=5),
             showlegend=False,
             hoverinfo='skip'
         ))
@@ -91,13 +91,12 @@ def plot_curve_set(
     # make axes equal and add some padding
     fig.update_layout(
         scene=dict(
-            xaxis=dict(title='X', backgroundcolor="rgb(230, 230,230)", showspikes=False),
-            yaxis=dict(title='Y', backgroundcolor="rgb(230, 230,230)", showspikes=False),
-            zaxis=dict(title='Z', backgroundcolor="rgb(230, 230,230)", showspikes=False),
+            xaxis=dict(title='X', backgroundcolor="rgb(230, 230,230)", showspikes=False, showbackground=False, showgrid=False, visible=False),
+            yaxis=dict(title='Y', backgroundcolor="rgb(230, 230,230)", showspikes=False, showbackground=False, showgrid=False, visible=False),
+            zaxis=dict(title='Z', backgroundcolor="rgb(230, 230,230)", showspikes=False, showbackground=False, showgrid=False, visible=False),
             aspectmode='data'
         ),
         width=800, height=800,
-        title="Duck Model",
         showlegend=False,
     )
 
