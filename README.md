@@ -4,7 +4,7 @@
   <img src="assets/pipeline.png" width=700px />
 </p>
 
-This repository contains the project proposal and pseudocode for “From Pixels to Wireframes,” a method for generating **3D sketch abstractions** using CLIP-based losses and Bézier curves on reconstructed surfaces.
+This repository contains the complete implementation and supporting modules for the course project titled **“From Pixels to Wireframes: Reconstruction via CLIP-Based Sketch Abstraction”**, developed as part of the EPFL **CS503 — Visual Intelligence: Machines and Minds** course. The project explores a novel approach to abstracting 3D surfaces into wireframe-like representations by leveraging CLIP-based semantic guidance and Bézier curve parameterizations.
 
 ---
 
