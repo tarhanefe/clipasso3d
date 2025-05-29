@@ -47,44 +47,70 @@ clipasso3d/
    pip install -r requirements.txt
    ```
 ---
+# How to Use ? 
 
-# Demo
+## 1- Trial Notebook
 
-## Single View 3D Generations
+Use ```WireframeTrial.ipynb```  notebook inside the notebooks folder to interactively examine the training process and obtained results.
 
-### A snake
+## 2- Run file 
 
+```bash
+  cd clipasso3d
+  python run.py \
+  --data_name rose \
+  --save_dir training_frames \
+  --output_gif training_evolution.gif \
+  --batch_size 1 \
+  --epochs 10 \
+  --inner_steps 30 \
+  --learning_rate 0.005 \
+  --n_curves 25 \
+  --thickness 0.02 \
+  --radius 0.8 \
+  --length 0.02 \
+  --overlap 0.6 \
+  --clip_weight 1.0 \
+  --clip_conv_loss 1.0 \
+  --clip_fc_loss_weight 0.1 \
+  --clip_conv_layer_weights 0 0 1.0 1.0 0.0 \
+  --gif_fps 120 \
+  --rotation_time 6.0 \
+  --revolutions 3.0 \
+  --output_semigif semihelical.gif
+```
+where 
 
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/snake.gif" width="250px"><br>Evolution of the Model From 1 Viewpoint</td>
-    <td align="center"><img src="data/snake.jpg" width="250px"><br>Original Image</td>
-  </tr>
-</table>
+### 🔧 Argument Descriptions
 
-### A giraffe
+| Argument                     | Description                                                                 |
+|-----------------------------|-----------------------------------------------------------------------------|
+| `--data_name`               | Name of dataset folder inside `../data/` (e.g., `rose`).                    |
+| `--save_dir`                | Directory to save per-batch visualization frames.                           |
+| `--output_gif`              | Path to save the training evolution GIF.                                    |
+| `--batch_size`              | Number of images processed per training batch.                              |
+| `--epochs`                  | Number of training epochs.                                                  |
+| `--inner_steps`             | Inner optimization steps per batch.                                         |
+| `--learning_rate`           | Learning rate for Adam optimizer.                                           |
+| `--n_curves`                | Number of Bézier curves initialized in the scene.                           |
+| `--thickness`               | Radius (thickness) of each rendered curve/sphere segment.                   |
+| `--radius`                  | Distance from the scene center to place initial curve points.               |
+| `--length`                  | Length of each curve segment.                                               |
+| `--overlap`                 | Degree of allowed overlap between nearby curves.                            |
+| `--clip_weight`             | Total CLIP loss weight.                                                     |
+| `--clip_conv_loss`          | Weight of the convolutional CLIP loss.                                      |
+| `--clip_fc_loss_weight`     | Weight of CLIP’s final-layer (semantic) similarity loss.                    |
+| `--clip_conv_layer_weights` | Weights for each CLIP convolutional layer (ViT-B/32 has 5 layers).          |
+| `--gif_fps`                 | Frame rate (FPS) of generated GIFs.                                         |
+| `--rotation_time`           | Duration (in seconds) of 3D camera rotation in the fly-around GIF.          |
+| `--revolutions`             | Number of full revolutions in the semihelical fly-around.                   |
+| `--output_semigif`          | Output path for the 3D rendered semihelical GIF animation.                  |
 
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/giraffe.gif" width="250px"><br>Evolution of the Model From 1 Viewpoint</td>
-    <td align="center"><img src="data/giraffe.jpg" width="250px"><br>Original Image</td>
-  </tr>
-</table>
+---
 
-### A dolphin
+## Examples
 
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/dolphin.gif" width="250px"><br>Evolution of the Model From 1 Viewpoint</td>
-    <td align="center"><img src="data/dolphin.png" width="250px"><br>Original Image</td>
-  </tr>
-</table>
-
-
-
-## Multi View 3D Generations
-
-### The plant 
+#### The plant 
 
 
 <table align="center">
@@ -96,7 +122,7 @@ clipasso3d/
 </table>
 
 
-### The rose 
+#### The rose 
 
 <table align="center">
   <tr>
@@ -114,7 +140,7 @@ clipasso3d/
 </table>
 
 
-### The duck 
+#### The duck 
 
 <table align="center">
   <tr>
