@@ -70,10 +70,13 @@ def plot_curve_set(
         t = torch.linspace(0.0, 1.0, steps=resolution, device=bezier.device)
         bezier_pts = bezier._bezier_pts(t.unsqueeze(1)).detach().cpu().numpy() # (K,3)
 
+        # don't label the traces
+
         fig.add_trace(go.Scatter3d(
             x=bezier_pts[:, 0], y=bezier_pts[:, 1], z=bezier_pts[:, 2],
             mode='lines', line=dict(color='blue', width=5),
-            name='Bézier Curve'
+            showlegend=False,
+            hoverinfo='skip'
         ))
 
         if plot_control_points:
@@ -88,13 +91,14 @@ def plot_curve_set(
     # make axes equal and add some padding
     fig.update_layout(
         scene=dict(
-            xaxis=dict(title='X', backgroundcolor="rgb(230, 230,230)"),
-            yaxis=dict(title='Y', backgroundcolor="rgb(230, 230,230)"),
-            zaxis=dict(title='Z', backgroundcolor="rgb(230, 230,230)"),
+            xaxis=dict(title='X', backgroundcolor="rgb(230, 230,230)", showspikes=False),
+            yaxis=dict(title='Y', backgroundcolor="rgb(230, 230,230)", showspikes=False),
+            zaxis=dict(title='Z', backgroundcolor="rgb(230, 230,230)", showspikes=False),
             aspectmode='data'
         ),
         width=800, height=800,
-        title="Bézier Curve and Control Points"
+        title="Duck Model",
+        showlegend=False,
     )
 
     if c2w is not None:
@@ -112,3 +116,5 @@ def plot_curve_set(
 
     # show the plot
     fig.show()
+
+    return fig
