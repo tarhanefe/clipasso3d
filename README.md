@@ -95,8 +95,8 @@ where
 | `--n_curves`                | Number of Bézier curves initialized in the scene.                           |
 | `--thickness`               | Radius (thickness) of each rendered curve/sphere segment.                   |
 | `--radius`                  | Distance from the scene center to place initial curve points.               |
-| `--length`                  | Length of each curve segment.                                               |
-| `--overlap`                 | Degree of allowed overlap between nearby curves.                            |
+| `--length`                  | Length of the each initial curve segment.                                   |
+| `--overlap`                 | Degree of allowed overlap between nearby spherical gaussians on a curve.    |
 | `--clip_weight`             | Total CLIP loss weight.                                                     |
 | `--clip_conv_loss`          | Weight of the convolutional CLIP loss.                                      |
 | `--clip_fc_loss_weight`     | Weight of CLIP’s final-layer (semantic) similarity loss.                    |
