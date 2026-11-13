@@ -6,6 +6,8 @@
 #   D_hull    B + visual-hull initialization (longer initial strokes)
 #   E_mv      B + 4 views per step, 1 step per batch
 #   F_all     B + C + D + E
+#   G_clipasso F_all with CLIPasso's loss balance: no extra semantic CLIPLoss (--clip_weight 0),
+#             geometric conv loss (layers 2,3) + 0.1 x semantic fc loss
 # Usage: experiments/round1.sh [objects...]   (default: 6 diverse objects)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -25,11 +27,12 @@ declare -A CFG=(
   [D_hull]="${OLD[*]} ${FIX[*]} ${HULL[*]}"
   [E_mv]="${MV[*]} ${FIX[*]}"
   [F_all]="${MV[*]} ${FIX[*]} ${HULL[*]} ${BW[*]}"
+  [G_clipasso]="${MV[*]} ${FIX[*]} ${HULL[*]} ${BW[*]} --clip_weight 0"
 )
 mkdir -p jobs/round1
 for obj in "${OBJECTS[@]}"; do
   out="jobs/round1/${obj}.jsonl"; rm -f "$out"
-  for name in A_old B_fixed C_bw D_hull E_mv F_all; do
+  for name in A_old B_fixed C_bw D_hull E_mv F_all G_clipasso; do
     # shellcheck disable=SC2086
     python tools/sweep.py make --datasets "data/objaverse/$obj" --run_name "round1_$name" \
       --runs_root runs --out "$out" --append -- "${COMMON[@]}" ${CFG[$name]} >/dev/null

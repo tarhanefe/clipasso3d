@@ -34,7 +34,7 @@ class Loss(nn.Module):
         losses_to_apply = []
         if self.percep_loss != "none":
             losses_to_apply.append(self.percep_loss)
-        if self.train_with_clip and self.start_clip == 0:
+        if self.train_with_clip and self.start_clip == 0 and self.clip_weight:
             losses_to_apply.append("clip")
         if self.clip_conv_loss:
             losses_to_apply.append("clip_conv_loss")
@@ -44,7 +44,7 @@ class Loss(nn.Module):
 
     def update_losses_to_apply(self, epoch):
         if "clip" not in self.losses_to_apply:
-            if self.train_with_clip:
+            if self.train_with_clip and self.clip_weight:
                 if epoch > self.start_clip:
                     self.losses_to_apply.append("clip")
 
