@@ -1,8 +1,9 @@
 #!/bin/bash
 # Main ablations: number of lines x abstraction, one job list per object (one pod per object).
-# Thickness is fixed (0.008). The base configuration is the winner of round 1 (override with BASE=...).
+# Fixed for all runs: thickness 0.008, black strokes on white, visual-hull initialization, 8 different
+# views per step for 150 epochs (1950 steps), all curves sampled at once with adaptive density.
 # Curves that end up off the object (outside the visual hull) or collapse are deleted from 25% of
-# training on, every 10% (3000 batches: start 750, every 300); metrics.json reports n_curves_final.
+# training on, every 10% (start 490, every 195); metrics.json reports n_curves_final.
 #
 # Abstraction = balance of CLIPasso's two losses (no extra semantic CLIPLoss, --clip_weight 0):
 #   geometric: L2 between CLIP ViT layers 2,3 of sketch and target (per-layer weights below)
@@ -20,8 +21,8 @@ if [ ${#OBJECTS[@]} -eq 0 ]; then
   for d in data/objaverse/*/; do [ -f "$d/transforms_test.json" ] && OBJECTS+=("$(basename "$d")"); done
 fi
 WANDB=(--wandb --wandb_mode offline --wandb_entity efe-tarhan-epfl --wandb_project clipasso3d)
-BASE=${BASE:-"--epochs 120 --batch_size 4 --inner_steps 1 --frame_every 15 --init hull --length 0.15 --style black_on_white"}
-PRUNE=${PRUNE:-"--prune_start 750 --prune_every 300"}
+BASE=${BASE:-"--epochs 150 --batch_size 8 --inner_steps 1 --frame_every 10 --eval_interval 100 --init hull --length 0.15 --style black_on_white --sample_spacing 0.5"}
+PRUNE=${PRUNE:-"--prune_start 490 --prune_every 195"}
 COMMON=(--thickness 0.008 --rasterizer sparse --clip_weight 0 --gif_fps 30 --rotation_time 6 "${WANDB[@]}")
 LINES=(10 20 50 100 200 500 1000)
 declare -A ABS=(

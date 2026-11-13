@@ -20,20 +20,20 @@ def parse_args():
     parser.add_argument('--output_gif', type=str, default='training_evolution.gif', help='Training GIF name inside the run folder')
 
     # Optimization parameters
-    parser.add_argument('--batch_size', type=int, default=1)
-    parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--inner_steps', type=int, default=30)
+    parser.add_argument('--batch_size', type=int, default=8, help='Different training views per optimization step')
+    parser.add_argument('--epochs', type=int, default=150, help='Passes over the training views (100 views / 8 = 13 steps each)')
+    parser.add_argument('--inner_steps', type=int, default=1, help='Optimization steps per sampled batch of views')
     parser.add_argument('--learning_rate', type=float, default=0.005)
-    parser.add_argument('--eval_interval', type=int, default=0, help='Validate every N batches (0 = once per epoch)')
+    parser.add_argument('--eval_interval', type=int, default=100, help='Validate every N batches (0 = once per epoch)')
     parser.add_argument('--ckpt_every', type=int, default=20, help='Checkpoint every N batches')
-    parser.add_argument('--frame_every', type=int, default=1, help='Save a render|target frame every N batches')
+    parser.add_argument('--frame_every', type=int, default=10, help='Save a render|target frame every N batches')
     parser.add_argument('--no_compile', action='store_true', help='Skip torch.compile (CPU smoke tests)')
     parser.add_argument('--rasterizer', type=str, default='sparse', choices=['sparse', 'dense'],
                         help='dense: every sphere at every pixel; sparse: +-4 sigma window per sphere (needed for many curves)')
 
     # Curve parameters
     parser.add_argument('--n_curves', type=int, default=25)
-    parser.add_argument('--thickness', type=float, default=0.02)
+    parser.add_argument('--thickness', type=float, default=0.008, help='Stroke radius (Gaussian sigma) in scene units; 0.008 ~ 0.75 px')
     parser.add_argument('--radius', type=float, default=0.8)
     parser.add_argument('--length', type=float, default=0.15, help='Length of each initial line')
     parser.add_argument('--overlap', type=float, default=0.6)
@@ -57,11 +57,12 @@ def parse_args():
     parser.add_argument('--connect_start', type=int, default=0, help='First batch with the connectivity loss')
     parser.add_argument('--n_snapshots', type=int, default=100,
                         help='Control-point snapshots saved over training (curves_history.npz, for the 4D viewer)')
-    parser.add_argument('--style', type=str, default='white_on_black', choices=['white_on_black', 'black_on_white'],
+    parser.add_argument('--style', type=str, default='black_on_white', choices=['black_on_white', 'white_on_black'],
                         help='Stroke/background colors (targets are composited on the same background)')
 
     # CLIP-related weights
-    parser.add_argument('--clip_weight', type=float, default=1.0)
+    parser.add_argument('--clip_weight', type=float, default=0.0,
+                        help='Extra semantic CLIPLoss with augmentations (0 = CLIPasso loss balance: conv layers + 0.1 x fc)')
     parser.add_argument('--clip_conv_loss', type=float, default=1.0)
     parser.add_argument('--clip_fc_loss_weight', type=float, default=0.1)
     parser.add_argument('--clip_conv_layer_weights', type=float, nargs=5, default=[0, 0, 1.0, 1.0, 0.0])

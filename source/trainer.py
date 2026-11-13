@@ -271,8 +271,12 @@ class Trainer:
             self.snapshot(0)                                    # initialization
         for batch_idx in range(self.start_batch, self.total_batches):
             # sample batch
-            batch = [self.train_sampler.sample(random.randrange(self.N_train))
-                     for _ in range(self.batch_size)]
+            # `batch_size` different views (with replacement only if there are fewer views than that)
+            if self.batch_size <= self.N_train:
+                views = random.sample(range(self.N_train), self.batch_size)
+            else:
+                views = [random.randrange(self.N_train) for _ in range(self.batch_size)]
+            batch = [self.train_sampler.sample(i) for i in views]
 
             # inner optimization
             for _ in range(self.inner_steps):

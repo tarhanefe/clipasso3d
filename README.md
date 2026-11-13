@@ -57,28 +57,21 @@ Use ```WireframeTrial.ipynb```  notebook inside the notebooks folder to interact
 
 ```bash
   cd clipasso3d
-  python run.py \
-  --data_name rose \
-  --run_name default \
-  --output_gif training_evolution.gif \
-  --batch_size 1 \
-  --epochs 10 \
-  --inner_steps 30 \
-  --learning_rate 0.005 \
-  --n_curves 25 \
-  --thickness 0.02 \
-  --radius 0.8 \
-  --length 0.02 \
-  --overlap 0.6 \
-  --clip_weight 1.0 \
-  --clip_conv_loss 1.0 \
-  --clip_fc_loss_weight 0.1 \
-  --clip_conv_layer_weights 0 0 1.0 1.0 0.0 \
-  --gif_fps 120 \
-  --rotation_time 6.0 \
-  --revolutions 3.0 \
-  --output_semigif semihelical.gif
+  python run.py --data_name objaverse/teapot --run_name default
 ```
+Defaults: black strokes on white, curves initialized on the visual hull, 25 curves of thickness 0.008,
+8 different views per step for 150 epochs, CLIPasso's loss balance (CLIP ViT layers 2,3 + 0.1 x
+semantic), all curves sampled at once with adaptive density. `python run.py --help` lists every option.
+
+<details><summary>The original settings of the course project</summary>
+
+```bash
+  python run.py --data_name rose --init sphere --length 0.02 --style white_on_black --sample_spacing 0 \
+  --rasterizer dense --batch_size 1 --epochs 10 --inner_steps 30 --n_curves 25 --thickness 0.02 \
+  --clip_weight 1.0 --clip_fc_loss_weight 0.1 --clip_conv_layer_weights 0 0 1.0 1.0 0.0
+```
+</details>
+
 where 
 
 ### 🔧 Argument Descriptions
