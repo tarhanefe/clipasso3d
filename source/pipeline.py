@@ -139,7 +139,7 @@ def run_pipeline(args):
                       n_snapshots=args.n_snapshots, connect_loss=connect_loss, connect_start=args.connect_start,
                       early_stop_patience=args.early_stop_patience, early_stop_tol=args.early_stop_tol,
                       min_batches=args.min_batches, snapshot_every=args.snapshot_every,
-                      prune_mode=args.prune_mode, respawn_length=args.length)
+                      prune_mode=args.prune_mode, respawn_length=args.length, prune_stop=args.prune_stop)
 
     means, thicknesses = trainer.train()
     weld_info = {}

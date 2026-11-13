@@ -4,7 +4,7 @@
 #
 # Fixed for all runs (the run.py defaults): thickness 0.008, black strokes on white, visual-hull
 # initialization, 8 different views per step, all curves sampled at once with adaptive density,
-# no connectivity constraint. From batch 490 on, every 195 batches, curves that ended up off the object
+# no connectivity constraint. From batch 490 until 2450, every 195 batches, curves that ended up off the object
 # (outside the visual hull) or collapsed are respawned as new short lines on the least covered part of
 # the hull, so every run keeps exactly its number of lines (early stopping restarts after a respawn).
 # Each run stops when the validation loss (every 100 batches) has not improved by 0.5% for 5
@@ -29,7 +29,7 @@ if [ ${#OBJECTS[@]} -eq 0 ]; then
 fi
 WANDB=(--wandb --wandb_mode offline --wandb_entity efe-tarhan-epfl --wandb_project clipasso3d)
 STOP=(--epochs 600 --eval_interval 100 --early_stop_patience 5 --early_stop_tol 0.005 --min_batches 500)
-PRUNE=(--prune_mode respawn --prune_start 490 --prune_every 195)
+PRUNE=(--prune_mode respawn --prune_start 490 --prune_every 195 --prune_stop 2450)
 COMMON=(--thickness 0.008 --snapshot_every 20 --frame_every 10 --gif_fps 30 --rotation_time 6
         "${STOP[@]}" "${PRUNE[@]}" "${WANDB[@]}")
 LINES=(5 10 20 50 100 200)

@@ -54,6 +54,9 @@ def parse_args():
     parser.add_argument('--prune_mode', type=str, default='respawn', choices=['respawn', 'delete'],
                         help='respawn: replace bad curves by new lines on the visual hull (line count fixed); delete: remove them')
     parser.add_argument('--prune_start', type=int, default=0, help='First batch at which pruning may happen')
+    parser.add_argument('--prune_stop', type=int, default=2450,
+                        help='No pruning/respawning from this batch on, so the final lines are all trained '
+                             '(and early stopping, which restarts after a respawn, can end the run); 0 = never stop')
     parser.add_argument('--prune_min_on_frac', type=float, default=0.5,
                         help='Delete a curve if less than this fraction of its points lies inside the visual hull')
     parser.add_argument('--prune_min_length', type=float, default=0.005, help='Delete a curve shorter than this')

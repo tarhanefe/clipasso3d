@@ -60,6 +60,7 @@ class Trainer:
         snapshot_every: int = 0,
         prune_mode: str = "delete",
         respawn_length: float = 0.15,
+        prune_stop: int = 0,
     ):
         self.train_sampler = train_sampler
         self.val_sampler = val_sampler
@@ -93,6 +94,7 @@ class Trainer:
         self.prune_min_length = prune_min_length
         self.prune_mode = prune_mode            # "delete" or "respawn" (replace on the visual hull)
         self.respawn_length = respawn_length
+        self.prune_stop = prune_stop            # no pruning from this batch on (0 = never stop)
         self._hull_surface = None
         # snapshots of all control points during training (for the interactive 4D viewer)
         self.n_snapshots = n_snapshots
@@ -336,6 +338,7 @@ class Trainer:
             # periodic pruning of curves off the object
             n_pruned = None
             if (self.prune_every and batch_idx >= self.prune_start
+                    and (not self.prune_stop or batch_idx < self.prune_stop)
                     and (batch_idx - self.prune_start) % self.prune_every == 0):
                 if self.prune_mode == "respawn":
                     if self._hull_surface is None:
