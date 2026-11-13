@@ -239,3 +239,14 @@ def hull_short_lines(sampler, n_curves: int, length: float, grid: int = 64, devi
         offs = torch.tensor([-0.5, -0.1667, 0.1667, 0.5], device=device) * length
         lines.append(loc[None] + offs[:, None] * dir_line[None])
     return lines
+
+
+def line_at(loc: torch.Tensor, center: torch.Tensor, length: float):
+    """4 control points of a short straight line through `loc`, orthogonal to the direction from `center`."""
+    dir_loc = loc - center
+    dir_loc = dir_loc / dir_loc.norm().clamp_min(1e-8)
+    v = torch.randn(3, device=loc.device)
+    dir_line = v - (v @ dir_loc) * dir_loc
+    dir_line = dir_line / dir_line.norm().clamp_min(1e-8)
+    offs = torch.tensor([-0.5, -0.1667, 0.1667, 0.5], device=loc.device) * length
+    return loc[None] + offs[:, None] * dir_line[None]

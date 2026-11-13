@@ -10,7 +10,8 @@ from PIL import Image
 
 sys.path.append("..")
 from source.imagesampler import ImageSampler
-from source.pruning import prune_curves, rebuild_optimizer
+from source.pruning import prune_curves, respawn_curves, rebuild_optimizer
+from source.initalizer import visual_hull
 
 class Trainer:
     """
@@ -57,6 +58,8 @@ class Trainer:
         early_stop_tol: float = 0.005,
         min_batches: int = 0,
         snapshot_every: int = 0,
+        prune_mode: str = "delete",
+        respawn_length: float = 0.15,
     ):
         self.train_sampler = train_sampler
         self.val_sampler = val_sampler
@@ -88,6 +91,9 @@ class Trainer:
         self.prune_start = prune_start
         self.prune_min_on_frac = prune_min_on_frac
         self.prune_min_length = prune_min_length
+        self.prune_mode = prune_mode            # "delete" or "respawn" (replace on the visual hull)
+        self.respawn_length = respawn_length
+        self._hull_surface = None
         # snapshots of all control points during training (for the interactive 4D viewer)
         self.n_snapshots = n_snapshots
         self.snapshots = []          # list of (batch, curve ids, control points float16 (C,N,3))
@@ -331,11 +337,22 @@ class Trainer:
             n_pruned = None
             if (self.prune_every and batch_idx >= self.prune_start
                     and (batch_idx - self.prune_start) % self.prune_every == 0):
-                self.optimizer, n_pruned, info = prune_curves(
-                    self.curve_set, self.optimizer, self.train_sampler,
-                    self.prune_min_on_frac, self.prune_min_length)
-                print(f"Pruning at batch {batch_idx}: removed {n_pruned}, {len(self.curve_set.curves)} curves left "
+                if self.prune_mode == "respawn":
+                    if self._hull_surface is None:
+                        self._hull_surface = visual_hull(self.train_sampler)[1]
+                    self.optimizer, n_pruned, info = respawn_curves(
+                        self.curve_set, self.optimizer, self.train_sampler, self._hull_surface,
+                        self.respawn_length, self.prune_min_on_frac, self.prune_min_length)
+                    action = "respawned"
+                else:
+                    self.optimizer, n_pruned, info = prune_curves(
+                        self.curve_set, self.optimizer, self.train_sampler,
+                        self.prune_min_on_frac, self.prune_min_length)
+                    action = "removed"
+                print(f"Pruning at batch {batch_idx}: {action} {n_pruned}, {len(self.curve_set.curves)} curves "
                       f"({info['n_off_object']} off the object, {info['n_collapsed']} collapsed)", flush=True)
+                if n_pruned and self.prune_mode == "respawn":
+                    self.bad_evals = 0      # new lines need time to train before the run may stop
 
             # periodic validation
             val_loss = None

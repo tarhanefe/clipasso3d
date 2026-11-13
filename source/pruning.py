@@ -71,3 +71,34 @@ def prune_curves(curve_set, optimizer, sampler, min_on_frac=0.5, min_length=0.00
         optimizer = rebuild_optimizer(optimizer, list(curve_set.parameters()))
     return optimizer, removed, {"on_frac_mean": on_frac.mean().item(), "n_off_object": int((on_frac < min_on_frac).sum()),
                                 "n_collapsed": int((length < min_length).sum())}
+
+
+@torch.no_grad()
+def respawn_curves(curve_set, optimizer, sampler, hull_surface, length, min_on_frac=0.5, min_length=0.005):
+    """
+    Replace curves that lie off the object or have collapsed by new short lines on the visual hull,
+    so the number of curves never changes. Each new line goes to the hull surface point farthest from
+    all current curves (the least covered part of the object); its optimizer state is reset and it gets
+    a new id (it is a new line in the training snapshots).
+    Returns (optimizer, number of curves respawned, scores dict).
+    """
+    from source.initalizer import line_at
+
+    on_frac, curve_len = curve_object_scores(curve_set, sampler)
+    bad = ((on_frac < min_on_frac) | (curve_len < min_length)).nonzero().flatten().tolist()
+    if bad and len(hull_surface):
+        center = torch.as_tensor(sampler.scene_center, device=hull_surface.device, dtype=torch.float32)
+        good = [p for i, p in enumerate(curve_set.curve_samples()) if i not in set(bad)]
+        covered = torch.cat(good) if good else hull_surface[:1]
+        d = torch.cdist(hull_surface, covered).min(dim=1).values
+        next_id = max(curve_set.ids) + 1
+        for i in bad:
+            loc = hull_surface[d.argmax()]
+            P = curve_set.curves[i].P
+            P.copy_(line_at(loc, center, length).to(P))
+            optimizer.state.pop(P, None)                 # Adam starts fresh for this curve
+            curve_set.ids[i] = next_id
+            next_id += 1
+            d = torch.minimum(d, (hull_surface - loc).norm(dim=1))
+    return optimizer, len(bad), {"on_frac_mean": on_frac.mean().item(), "n_off_object": int((on_frac < min_on_frac).sum()),
+                                 "n_collapsed": int((curve_len < min_length).sum())}
