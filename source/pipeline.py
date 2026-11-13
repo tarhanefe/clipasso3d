@@ -114,7 +114,10 @@ def run_pipeline(args):
     else:
         rasterizer = rasterize_spheres if args.no_compile else torch.compile(rasterize_spheres)
     center_t = torch.tensor(train_sampler.scene_center, device=device, dtype=torch.float32)
-    if args.init == 'hull':
+    if args.init_from:
+        # start from the final curves of another run (e.g. weld an existing result with --epochs 0)
+        curves = [c.to(device) for c in torch.load(args.init_from, map_location=device, weights_only=False)['control_points']]
+    elif args.init == 'hull':
         curves = hull_short_lines(train_sampler, args.n_curves, args.length, args.hull_grid, device)
     else:
         curves = random_short_lines(center_t, args.n_curves, args.radius, args.length, device)
@@ -143,12 +146,13 @@ def run_pipeline(args):
 
     means, thicknesses = trainer.train()
     weld_info = {}
-    if connect_loss is not None:
+    if connect_loss is not None or args.weld:
+        weld_info.update({f"pre_weld_{k}": v for k, v in connectivity_stats(curve_set, contact_eps).items()})
         # guarantee one buildable piece: translate leftover separate clusters onto the main one
         n_moved, dist = weld(curve_set, contact_eps)
-        weld_info = {"weld_clusters_moved": n_moved, "weld_total_shift": dist}
+        weld_info.update({"weld_clusters_moved": n_moved, "weld_total_shift": dist})
         print(f"Weld: moved {n_moved} clusters by {dist:.4f} in total")
-        trainer.snapshot(trainer.total_batches + 1)
+        trainer.snapshot((trainer.stopped_at or trainer.total_batches) + 1)
         with torch.no_grad():
             means, thicknesses = curve_set()
     trainer.save_snapshots(str(out_dir / "curves_history.npz"))
@@ -164,7 +168,7 @@ def run_pipeline(args):
 
     # -- metrics on the held-out test views (and on the true surface when the dataset has it) --
     clip_model = criterion.loss_mapper["clip"].model
-    metrics = {"test_loss": trainer.test_loss, "n_curves_init": args.n_curves,
+    metrics = {"test_loss": trainer.test_loss, "n_curves_init": len(curves),
                "batches_trained": trainer.stopped_at or trainer.total_batches, "best_val_loss": trainer.best_val if trainer.best_val != float("inf") else None,
                "n_curves_final": len(curve_set.curves),
                **evaluate_views(curve_set, rasterizer, test_sampler, clip_model, args.width, args.height, invert)}

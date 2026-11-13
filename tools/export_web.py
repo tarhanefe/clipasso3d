@@ -8,6 +8,9 @@ Export runs for the interactive website grids (CLIPasso3DWebsite/static/data).
     # shared index (objects, credits, grid axes) and metric tables
     python tools/export_web.py index --out ../CLIPasso3DWebsite/static/data --manifest meshes/objaverse/manifest.json
     python tools/export_web.py metrics --out ../CLIPasso3DWebsite/static/data --pattern "abl_L{col}_{row}" ...
+    # connectivity grid: the "off" row reuses the main ablation's normal-level runs
+    python tools/export_web.py runs --out ../CLIPasso3DWebsite/static/data --family connect \
+        --pattern "conn_L{col}_{row}" --row_pattern "off=abl_L{col}_normal" --rows off weld loss01 loss1 --cols 5 20 50 200
 
 Per object and family it writes <out>/<family>/<object>/:
     runs.json    {"scale": s, "runs": {"<row>|<col>": {curves, snapshots: [batches], final_offset, history_offset}}}
@@ -51,7 +54,8 @@ def export_family(args):
         runs, finals, hist = {}, [], []
         for row in args.rows:
             for col in args.cols:
-                rd = os.path.join(args.runs_root, args.pattern.format(row=row, col=col), "objaverse", obj)
+                pattern = dict(rp.split("=", 1) for rp in args.row_pattern).get(row, args.pattern)
+                rd = os.path.join(args.runs_root, pattern.format(row=row, col=col), "objaverse", obj)
                 if not (os.path.exists(os.path.join(rd, "DONE")) and os.path.exists(os.path.join(rd, "curves_history.npz"))):
                     continue
                 batches, snaps = read_history(rd, args.max_snapshots)
@@ -137,6 +141,8 @@ def main():
     p.add_argument("--cols", nargs="+", default=["5", "10", "20", "50", "100", "200"])
     p.add_argument("--objects", nargs="*", default=None)
     p.add_argument("--max_snapshots", type=int, default=40)
+    p.add_argument("--row_pattern", nargs="*", default=[],
+                   help="row=pattern overrides, e.g. off=abl_L{col}_normal for rows taken from another experiment")
     p.add_argument("--runs_root", default="runs")
     p.add_argument("--data_root", default="data/objaverse")
     p.add_argument("--manifest", default="meshes/objaverse/manifest.json")

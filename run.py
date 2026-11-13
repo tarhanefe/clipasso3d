@@ -64,6 +64,10 @@ def parse_args():
                         help='Connectivity loss weight: every curve touches another and all form one piece (0 = off)')
     parser.add_argument('--connect_eps', type=float, default=0.0, help='Contact distance (0 = 2 x thickness)')
     parser.add_argument('--connect_start', type=int, default=0, help='First batch with the connectivity loss')
+    parser.add_argument('--weld', action='store_true',
+                        help='Weld the final curves into one connected piece (also done whenever --connect_weight > 0)')
+    parser.add_argument('--init_from', type=str, default=None,
+                        help="Start from another run's curves.pt (with --epochs 0: only weld/evaluate that result)")
     parser.add_argument('--n_snapshots', type=int, default=100,
                         help='Control-point snapshots saved over training (curves_history.npz, for the 4D viewer)')
     parser.add_argument('--snapshot_every', type=int, default=0, help='Snapshot every N batches instead (0 = use --n_snapshots)')

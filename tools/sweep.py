@@ -39,8 +39,10 @@ def make_jobs(args, extra):
             continue
         rel = os.path.relpath(d, args.data_root)
         run_dir = os.path.join(args.runs_root, args.run_name, rel)
+        # "{data_name}" in the extra arguments is replaced by the dataset, e.g. a per-object --init_from path
         jobs.append({"run_dir": run_dir,
-                     "args": ["--data_root", args.data_root, "--data_name", rel, "--run_name", args.run_name] + extra})
+                     "args": ["--data_root", args.data_root, "--data_name", rel, "--run_name", args.run_name]
+                             + [a.replace("{data_name}", rel) for a in extra]})
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     if args.append and os.path.exists(args.out):
         done = {j["run_dir"] for j in load_jobs(args.out)}
