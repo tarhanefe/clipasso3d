@@ -303,13 +303,15 @@ class Trainer:
             for _ in range(self.inner_steps):
                 self.optimizer.zero_grad()
                 losses = []
-                for rgb, K, w2c in batch:
+                for v, (rgb, K, w2c) in enumerate(batch):
                     self.means, self.thicknesses = self.curve_set()
                     render = self.rasterizer(
                         self.means, self.thicknesses, w2c, K,
                         self.width, self.height
                     )
                     render = self.to_image(render)
+                    if v == 0:
+                        shown = render          # frames show view 0 next to its own target
                     it = batch_idx * self.inner_steps
                     losses.append(self.criterion(render, rgb, it))
                 train_loss_tensor = torch.stack(losses).mean()
@@ -348,9 +350,9 @@ class Trainer:
 
             # update display or save
             if self.display_plots:
-                self._update_display(render, batch[0][0], status)
+                self._update_display(shown, batch[0][0], status)
             if self.save_dir and batch_idx % self.frame_every == 0:
-                self._save_frame(batch_idx, render, batch[0][0])
+                self._save_frame(batch_idx, shown, batch[0][0])
 
             # early stopping on the (deterministic) validation loss
             stop = False
