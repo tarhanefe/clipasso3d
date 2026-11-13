@@ -42,6 +42,12 @@ def parse_args():
     parser.add_argument('--init', type=str, default='sphere', choices=['sphere', 'hull'],
                         help='sphere: random short lines on a sphere of --radius; hull: spread over the visual hull surface')
     parser.add_argument('--hull_grid', type=int, default=64, help='Voxel grid resolution of the visual hull')
+    parser.add_argument('--prune_every', type=int, default=0,
+                        help='Every N batches delete curves off the object (outside the visual hull) or collapsed; 0 = off')
+    parser.add_argument('--prune_start', type=int, default=0, help='First batch at which pruning may happen')
+    parser.add_argument('--prune_min_on_frac', type=float, default=0.5,
+                        help='Delete a curve if less than this fraction of its points lies inside the visual hull')
+    parser.add_argument('--prune_min_length', type=float, default=0.005, help='Delete a curve shorter than this')
     parser.add_argument('--style', type=str, default='white_on_black', choices=['white_on_black', 'black_on_white'],
                         help='Stroke/background colors (targets are composited on the same background)')
 

@@ -130,7 +130,9 @@ def run_pipeline(args):
                       device=device, display_plots=False,
                       ckpt_path=str(out_dir / "ckpt.pt"), ckpt_every=args.ckpt_every,
                       frame_every=args.frame_every, log_path=str(out_dir / "log.jsonl"),
-                      wandb_run=wandb_run, invert=invert)
+                      wandb_run=wandb_run, invert=invert,
+                      prune_every=args.prune_every, prune_start=args.prune_start,
+                      prune_min_on_frac=args.prune_min_on_frac, prune_min_length=args.prune_min_length)
 
     means, thicknesses = trainer.train()
 
@@ -144,7 +146,8 @@ def run_pipeline(args):
 
     # -- metrics on the held-out test views (and on the true surface when the dataset has it) --
     clip_model = criterion.loss_mapper["clip"].model
-    metrics = {"test_loss": trainer.test_loss,
+    metrics = {"test_loss": trainer.test_loss, "n_curves_init": args.n_curves,
+               "n_curves_final": len(curve_set.curves),
                **evaluate_views(curve_set, rasterizer, test_sampler, clip_model, args.width, args.height, invert)}
     surface = base / "surface_points.npy"
     if surface.exists():

@@ -10,6 +10,7 @@ from PIL import Image
 
 sys.path.append("..")
 from source.imagesampler import ImageSampler
+from source.pruning import prune_curves, rebuild_optimizer
 
 class Trainer:
     """
@@ -45,6 +46,10 @@ class Trainer:
         log_path: str = None,
         wandb_run=None,
         invert: bool = False,
+        prune_every: int = 0,
+        prune_start: int = 0,
+        prune_min_on_frac: float = 0.5,
+        prune_min_length: float = 0.005,
     ):
         self.train_sampler = train_sampler
         self.val_sampler = val_sampler
@@ -70,6 +75,12 @@ class Trainer:
         self.log_path = log_path
         self.wandb_run = wandb_run
         self.invert = invert    # True: black strokes on white (targets must be on white too)
+        # pruning: every `prune_every` batches from `prune_start` on, delete curves that lie
+        # outside the visual hull of the training masks or have collapsed (0 = off)
+        self.prune_every = prune_every
+        self.prune_start = prune_start
+        self.prune_min_on_frac = prune_min_on_frac
+        self.prune_min_length = prune_min_length
 
         # training schedule
         self.N_train = len(train_sampler)
@@ -117,7 +128,8 @@ class Trainer:
         if not (self.ckpt_path and os.path.exists(self.ckpt_path)):
             return 0
         state = torch.load(self.ckpt_path, map_location=self.device, weights_only=False)
-        self.curve_set.load_state_dict(state["curve_set"])
+        self.curve_set.load_state_dict(state["curve_set"])      # also drops curves pruned before
+        self.optimizer = rebuild_optimizer(self.optimizer, list(self.curve_set.parameters()))
         self.optimizer.load_state_dict(state["optimizer"])
         self.batch_indices = state["batch_indices"]
         self.train_losses = state["train_losses"]
@@ -248,6 +260,16 @@ class Trainer:
             self.batch_indices.append(batch_idx)
             self.train_losses.append(train_loss)
 
+            # periodic pruning of curves off the object
+            n_pruned = None
+            if (self.prune_every and batch_idx >= self.prune_start
+                    and (batch_idx - self.prune_start) % self.prune_every == 0):
+                self.optimizer, n_pruned, info = prune_curves(
+                    self.curve_set, self.optimizer, self.train_sampler,
+                    self.prune_min_on_frac, self.prune_min_length)
+                print(f"Pruning at batch {batch_idx}: removed {n_pruned}, {len(self.curve_set.curves)} curves left "
+                      f"({info['n_off_object']} off the object, {info['n_collapsed']} collapsed)", flush=True)
+
             # periodic validation
             val_loss = None
             if batch_idx % self.eval_interval == 0 or batch_idx == self.total_batches - 1:
@@ -265,7 +287,8 @@ class Trainer:
             if self.save_dir and batch_idx % self.frame_every == 0:
                 self._save_frame(batch_idx, render, batch[0][0])
 
-            self.log(batch=batch_idx + 1, total=self.total_batches, train_loss=train_loss, val_loss=val_loss)
+            self.log(batch=batch_idx + 1, total=self.total_batches, train_loss=train_loss, val_loss=val_loss,
+                     n_curves=len(self.curve_set.curves), n_pruned=n_pruned)
             if (batch_idx + 1) % self.ckpt_every == 0 or batch_idx == self.total_batches - 1:
                 self.save_checkpoint(batch_idx + 1)
 

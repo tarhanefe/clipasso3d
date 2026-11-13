@@ -142,6 +142,24 @@ class CurveSet(nn.Module):
         thicknesses = torch.cat(th_list, dim=0)    # (N,)
         return means, thicknesses
 
+    def curve_samples(self):
+        """Sample points of each curve as a list of (S_i,3) tensors (what forward() renders)."""
+        if self.samples_per_curve > 0:
+            means, _ = self._forward_fixed()
+            return list(means.view(len(self.curves), self.samples_per_curve, 3))
+        return [curve()[0] for curve in self.curves]
+
+    def keep_curves(self, keep):
+        """Keep only the curves whose entry in `keep` (list of bools) is True."""
+        self.curves = nn.ModuleList([c for c, k in zip(self.curves, keep) if k])
+
+    def load_state_dict(self, state_dict, strict=True, assign=False):
+        # a checkpoint taken after pruning has fewer curves than the freshly initialized set
+        n = len({k.split('.')[1] for k in state_dict if k.startswith('curves.')})
+        if n < len(self.curves):
+            self.curves = nn.ModuleList(list(self.curves)[:n])
+        return super().load_state_dict(state_dict, strict, assign)
+
     def remove_curve(self, idx):
         """Remove the curve at index `idx` (0-based)."""
         if idx < 0 or idx >= len(self.curves):
