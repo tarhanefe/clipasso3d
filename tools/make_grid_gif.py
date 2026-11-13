@@ -3,6 +3,10 @@ Animated grid of one object's ablation: rows = abstraction levels, columns = lin
 sketches rotating in sync with the ground-truth object (rendered by tools/render_turntable.py).
 
     python tools/make_grid_gif.py --object bicycle --turntable turntables/bicycle --out figures/bicycle_grid.gif
+    # connectivity rows (runs/conn_L<n>_off linked to the unconstrained abl_L<n>_normal runs)
+    python tools/make_grid_gif.py --object bicycle --turntable turntables/bicycle --prefix conn --lines 5 20 \\
+        --levels off weld loss01 loss1 --row_labels "no constraint" "weld only" "loss 0.1 + weld" "loss 1 + weld" \\
+        --title "{name}: connectivity" --out figures/bicycle_connect.gif
 """
 import argparse
 import json
@@ -72,8 +76,11 @@ def main():
     p.add_argument("--render_res", type=int, default=224, help="Sketch render resolution (training resolution)")
     p.add_argument("--fps", type=int, default=15)
     p.add_argument("--zoom", type=float, default=1.3, help="Crop the central 1/zoom of every view (object larger)")
+    p.add_argument("--title", default="{name}: number of lines x abstraction")
+    p.add_argument("--row_labels", nargs="*", default=None, help="Display names of --levels (same order)")
     p.add_argument("--out", required=True)
     args = p.parse_args()
+    row_label = dict(zip(args.levels, args.row_labels or [lv.replace("_", " ") for lv in args.levels]))
 
     cams = json.load(open(os.path.join(args.turntable, "cameras.json")))
     c2ws = [torch.tensor(c, dtype=torch.float32) for c in cams["c2w"]]
@@ -103,12 +110,12 @@ def main():
     base = Image.new("RGB", (W, H), "white")
     d = ImageDraw.Draw(base)
     name = args.object.replace("_", " ").split(" (")[0]
-    d.text((pad, 10), f"{name}: number of lines x abstraction", fill="black", font=f_title)
+    d.text((pad, 10), args.title.format(name=name), fill="black", font=f_title)
     d.text((pad, grid_y + (len(args.levels) * C - gt_size) // 2 - 22), "ground truth", fill="black", font=f_head)
     for j, n in enumerate(args.lines):
         d.text((grid_x + j * C + C // 2, title_h + head_h // 2), f"{n} lines", fill="black", font=f_head, anchor="mm")
     for i, level in enumerate(args.levels):
-        d.text((pad + gt_size + pad, grid_y + i * C + C // 2), level.replace("_", " "), fill="black",
+        d.text((pad + gt_size + pad, grid_y + i * C + C // 2), row_label[level], fill="black",
                font=f_head, anchor="lm")
     for i in range(len(args.levels) + 1):
         d.line([(grid_x, grid_y + i * C), (grid_x + len(args.lines) * C, grid_y + i * C)], fill=(225, 225, 225))
