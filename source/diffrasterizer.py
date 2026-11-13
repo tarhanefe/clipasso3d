@@ -65,3 +65,60 @@ def rasterize_spheres(
     alpha = 1 - torch.prod(1 - w + 1e-10, dim=2)  # (H,W)
 
     return alpha.unsqueeze(-1) # (H,W,1)
+
+
+def rasterize_spheres_sparse(
+    means: torch.Tensor,
+    radii_world: float | torch.Tensor,
+    viewmat: torch.Tensor,
+    K: torch.Tensor,
+    width: int,
+    height: int,
+    near: float = 1e-3,
+    n_sigma: float = 4.0,
+) -> torch.Tensor:
+    """
+    Same image as `rasterize_spheres`, but each Gaussian is only evaluated in a window of
+    +-n_sigma pixel-space standard deviations around its center (the tails beyond 4 sigma
+    are below 3e-4). Memory and time scale with (number of spheres x window) instead of
+    (number of spheres x pixels), so thousands of curves fit easily.
+    """
+    device, dtype = means.device, means.dtype
+    N = means.shape[0]
+
+    if isinstance(radii_world, (float, int)):
+        R_world = torch.full((N,), float(radii_world), device=device, dtype=dtype)
+    else:
+        R_world = radii_world.to(device=device, dtype=dtype).expand(N) if radii_world.ndim == 0 \
+            else radii_world.to(device=device, dtype=dtype)
+
+    # -- camera space and projection (same conventions as rasterize_spheres) --
+    cam = means @ viewmat[:3, :3].T + viewmat[:3, 3]
+    depth = -cam[:, 2]
+    visible = depth > near
+    depth = torch.where(visible, depth, torch.ones_like(depth))
+    fx, fy, cx, cy = K[0, 0], K[1, 1], K[0, 2], K[1, 2]
+    r_px = fx * R_world / depth
+    mu_x = cx + fx * cam[:, 0] / depth
+    mu_y = cy - fy * cam[:, 1] / depth
+
+    # -- window of pixels around each center --
+    rad = int(math.ceil(n_sigma * r_px[visible].max().item())) if visible.any() else 1
+    rad = max(1, min(rad, max(width, height)))
+    offs = torch.arange(-rad, rad + 1, device=device)
+    bx = torch.floor(mu_x).long().detach()
+    by = torch.floor(mu_y).long().detach()
+    px = bx[:, None, None] + offs[None, None, :]                    # (N,1,k)
+    py = by[:, None, None] + offs[None, :, None]                    # (N,k,1)
+    dx = (px.to(dtype) + 0.5) - mu_x[:, None, None]
+    dy = (py.to(dtype) + 0.5) - mu_y[:, None, None]
+    w = torch.exp(-0.5 * (dx * dx + dy * dy) / (r_px[:, None, None] ** 2 + 1e-8))
+    w = w * visible.to(dtype)[:, None, None]
+
+    px, py = torch.broadcast_tensors(px, py)
+    valid = (px >= 0) & (px < width) & (py >= 0) & (py < height) & visible[:, None, None]
+    log_t = torch.log(1 - w + 1e-10)                               # transmittance of each splat
+    idx = (py * width + px)[valid]
+    acc = torch.zeros(height * width, device=device, dtype=dtype).index_add(0, idx, log_t[valid])
+    alpha = 1 - torch.exp(acc)
+    return alpha.view(height, width, 1)

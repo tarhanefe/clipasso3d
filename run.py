@@ -28,6 +28,8 @@ def parse_args():
     parser.add_argument('--ckpt_every', type=int, default=20, help='Checkpoint every N batches')
     parser.add_argument('--frame_every', type=int, default=1, help='Save a render|target frame every N batches')
     parser.add_argument('--no_compile', action='store_true', help='Skip torch.compile (CPU smoke tests)')
+    parser.add_argument('--rasterizer', type=str, default='dense', choices=['dense', 'sparse'],
+                        help='dense: every sphere at every pixel; sparse: +-4 sigma window per sphere (needed for many curves)')
 
     # Curve parameters
     parser.add_argument('--n_curves', type=int, default=25)

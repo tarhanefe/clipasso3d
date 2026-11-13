@@ -11,7 +11,7 @@ from PIL import Image as PILImage
 from types import SimpleNamespace
 from source.cliploss import Loss
 from source.beziercurve import CurveSet
-from source.diffrasterizer import rasterize_spheres
+from source.diffrasterizer import rasterize_spheres, rasterize_spheres_sparse
 from source.imagesampler import ImageSampler
 from source.initalizer import random_short_lines, hull_short_lines
 from source.metrics import evaluate_views, chamfer_to_surface
@@ -108,7 +108,10 @@ def run_pipeline(args):
         aug_fill=1.0 if invert else 0.0,
     )).to(device)
 
-    rasterizer = rasterize_spheres if args.no_compile else torch.compile(rasterize_spheres)
+    if args.rasterizer == 'sparse':      # windowed splatting: scales to thousands of curves
+        rasterizer = rasterize_spheres_sparse
+    else:
+        rasterizer = rasterize_spheres if args.no_compile else torch.compile(rasterize_spheres)
     center_t = torch.tensor(train_sampler.scene_center, device=device, dtype=torch.float32)
     if args.init == 'hull':
         curves = hull_short_lines(train_sampler, args.n_curves, args.length, args.hull_grid, device)
@@ -158,7 +161,8 @@ def run_pipeline(args):
     render_semihelical_gif(means, args.thickness, scene_center, orbit_radius,
                            trainer.train_sampler.K, args.width, args.height,
                            args.gif_fps, args.rotation_time, args.revolutions,
-                           output_path=str(semigif), invert=invert)
+                           output_path=str(semigif), invert=invert,
+                           rasterize_fn=rasterize_spheres_sparse if args.rasterizer == 'sparse' else rasterize_spheres)
 
     train_gif = out_dir / args.output_gif
     frame_paths = sorted(frames_dir.glob("batch_*.png"))
@@ -194,7 +198,7 @@ def look_at(eye, center, up):
     return view
 
 
-def render_semihelical_gif(means, radii, scene_center, scene_radius, K, width, height, fps, rotation_time, revolutions, up=torch.tensor([0., 0, 1]), output_path="semihelical.gif", invert=False):
+def render_semihelical_gif(means, radii, scene_center, scene_radius, K, width, height, fps, rotation_time, revolutions, up=torch.tensor([0., 0, 1]), output_path="semihelical.gif", invert=False, rasterize_fn=rasterize_spheres):
     device = means.device
     center = scene_center.to(device=device, dtype=means.dtype)
     up_vec = up.to(device=device, dtype=means.dtype)
@@ -212,7 +216,7 @@ def render_semihelical_gif(means, radii, scene_center, scene_radius, K, width, h
         cam_pos = torch.tensor([x, y, z], device=device, dtype=means.dtype)
         V = look_at(cam_pos, center, up_vec)
         with torch.no_grad():
-            alpha = rasterize_spheres(means, radii, V, K, width, height)
+            alpha = rasterize_fn(means, radii, V, K, width, height)
         a = alpha[..., 0].detach().cpu().numpy()
         a_np = ((1 - a if invert else a) * 255).astype(np.uint8)
         rgb = np.stack([a_np] * 3, axis=-1)
