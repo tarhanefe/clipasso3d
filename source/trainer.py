@@ -53,6 +53,10 @@ class Trainer:
         n_snapshots: int = 100,
         connect_loss=None,
         connect_start: int = 0,
+        early_stop_patience: int = 0,
+        early_stop_tol: float = 0.005,
+        min_batches: int = 0,
+        snapshot_every: int = 0,
     ):
         self.train_sampler = train_sampler
         self.val_sampler = val_sampler
@@ -90,12 +94,21 @@ class Trainer:
         # optional extra loss on the curve set (e.g. connectivity), added from batch `connect_start`
         self.connect_loss = connect_loss
         self.connect_start = connect_start
+        # early stopping: stop when the validation loss has not improved by more than
+        # `early_stop_tol` (relative) for `early_stop_patience` validations (0 = off)
+        self.early_stop_patience = early_stop_patience
+        self.early_stop_tol = early_stop_tol
+        self.min_batches = min_batches
+        self.best_val = float("inf")
+        self.bad_evals = 0
+        self.stopped_at = None
 
         # training schedule
         self.N_train = len(train_sampler)
         self.updates_per_epoch = math.ceil(self.N_train / self.batch_size)
         self.total_batches = self.updates_per_epoch * self.epochs
-        self.snapshot_every = max(1, self.total_batches // self.n_snapshots) if self.n_snapshots else 0
+        # fixed interval (useful when early stopping makes the length unknown), else ~n_snapshots in total
+        self.snapshot_every = snapshot_every or (max(1, self.total_batches // self.n_snapshots) if self.n_snapshots else 0)
 
         # metrics tracking
         self.batch_indices = []
@@ -119,6 +132,9 @@ class Trainer:
             "val_batches": self.val_batches,
             "val_losses": self.val_losses,
             "curve_ids": self.curve_set.ids,
+            "best_val": self.best_val,
+            "bad_evals": self.bad_evals,
+            "stopped_at": self.stopped_at,
             "snapshots": self.snapshots,
             "rng_python": random.getstate(),
             "rng_numpy": np.random.get_state(),
@@ -143,6 +159,9 @@ class Trainer:
         self.curve_set.load_state_dict(state["curve_set"])      # also drops curves pruned before
         self.curve_set.ids = list(state.get("curve_ids", self.curve_set.ids))
         self.snapshots = state.get("snapshots", [])
+        self.best_val = state.get("best_val", float("inf"))
+        self.bad_evals = state.get("bad_evals", 0)
+        self.stopped_at = state.get("stopped_at")
         self.optimizer = rebuild_optimizer(self.optimizer, list(self.curve_set.parameters()))
         self.optimizer.load_state_dict(state["optimizer"])
         self.batch_indices = state["batch_indices"]
@@ -256,7 +275,7 @@ class Trainer:
         arr = (pair.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
         Image.fromarray(arr).save(path + ".tmp.png")
         os.replace(path + ".tmp.png", path)
-        if self.wandb_run is not None:
+        if self.wandb_run is not None and (batch_idx // self.frame_every) % 10 == 0:   # every 10th frame
             import wandb
             self.wandb_run.log({"render|target": wandb.Image(arr)}, step=batch_idx + 1)
 
@@ -269,7 +288,9 @@ class Trainer:
         self.start_batch = self.resume()
         if self.snapshot_every and not self.snapshots:
             self.snapshot(0)                                    # initialization
-        for batch_idx in range(self.start_batch, self.total_batches):
+        if self.stopped_at is not None:                         # resumed after an early stop
+            print(f"Early-stopped at batch {self.stopped_at} (resumed run)")
+        for batch_idx in range(self.start_batch, self.total_batches if self.stopped_at is None else 0):
             # sample batch
             # `batch_size` different views (with replacement only if there are fewer views than that)
             if self.batch_size <= self.N_train:
@@ -331,13 +352,29 @@ class Trainer:
             if self.save_dir and batch_idx % self.frame_every == 0:
                 self._save_frame(batch_idx, render, batch[0][0])
 
-            if self.snapshot_every and ((batch_idx + 1) % self.snapshot_every == 0 or batch_idx == self.total_batches - 1):
+            # early stopping on the (deterministic) validation loss
+            stop = False
+            if val_loss is not None and self.early_stop_patience:
+                if val_loss < self.best_val * (1 - self.early_stop_tol):
+                    self.best_val, self.bad_evals = val_loss, 0
+                else:
+                    self.bad_evals += 1
+                stop = self.bad_evals >= self.early_stop_patience and batch_idx + 1 >= self.min_batches
+                if stop:
+                    self.stopped_at = batch_idx + 1
+                    print(f"Early stop at batch {batch_idx + 1}: val loss flat for {self.bad_evals} validations "
+                          f"(best {self.best_val:.5f})", flush=True)
+
+            if self.snapshot_every and ((batch_idx + 1) % self.snapshot_every == 0
+                                        or batch_idx == self.total_batches - 1 or stop):
                 self.snapshot(batch_idx + 1)
             self.log(batch=batch_idx + 1, total=self.total_batches, train_loss=train_loss, val_loss=val_loss,
                      n_curves=len(self.curve_set.curves), n_pruned=n_pruned,
                      connect_loss=None if connect is None else connect.item())
-            if (batch_idx + 1) % self.ckpt_every == 0 or batch_idx == self.total_batches - 1:
+            if (batch_idx + 1) % self.ckpt_every == 0 or batch_idx == self.total_batches - 1 or stop:
                 self.save_checkpoint(batch_idx + 1)
+            if stop:
+                break
 
         # final test evaluation
         test_loss = self.evaluate(self.test_sampler)

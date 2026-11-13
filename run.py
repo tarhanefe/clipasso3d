@@ -25,6 +25,10 @@ def parse_args():
     parser.add_argument('--inner_steps', type=int, default=1, help='Optimization steps per sampled batch of views')
     parser.add_argument('--learning_rate', type=float, default=0.005)
     parser.add_argument('--eval_interval', type=int, default=100, help='Validate every N batches (0 = once per epoch)')
+    parser.add_argument('--early_stop_patience', type=int, default=0,
+                        help='Stop when the val loss has not improved for this many validations (0 = run all epochs)')
+    parser.add_argument('--early_stop_tol', type=float, default=0.005, help='Relative val-loss improvement that counts')
+    parser.add_argument('--min_batches', type=int, default=500, help='Never stop early before this many batches')
     parser.add_argument('--ckpt_every', type=int, default=20, help='Checkpoint every N batches')
     parser.add_argument('--frame_every', type=int, default=10, help='Save a render|target frame every N batches')
     parser.add_argument('--no_compile', action='store_true', help='Skip torch.compile (CPU smoke tests)')
@@ -57,6 +61,7 @@ def parse_args():
     parser.add_argument('--connect_start', type=int, default=0, help='First batch with the connectivity loss')
     parser.add_argument('--n_snapshots', type=int, default=100,
                         help='Control-point snapshots saved over training (curves_history.npz, for the 4D viewer)')
+    parser.add_argument('--snapshot_every', type=int, default=0, help='Snapshot every N batches instead (0 = use --n_snapshots)')
     parser.add_argument('--style', type=str, default='black_on_white', choices=['black_on_white', 'white_on_black'],
                         help='Stroke/background colors (targets are composited on the same background)')
 

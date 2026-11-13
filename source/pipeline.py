@@ -136,7 +136,9 @@ def run_pipeline(args):
                       wandb_run=wandb_run, invert=invert,
                       prune_every=args.prune_every, prune_start=args.prune_start,
                       prune_min_on_frac=args.prune_min_on_frac, prune_min_length=args.prune_min_length,
-                      n_snapshots=args.n_snapshots, connect_loss=connect_loss, connect_start=args.connect_start)
+                      n_snapshots=args.n_snapshots, connect_loss=connect_loss, connect_start=args.connect_start,
+                      early_stop_patience=args.early_stop_patience, early_stop_tol=args.early_stop_tol,
+                      min_batches=args.min_batches, snapshot_every=args.snapshot_every)
 
     means, thicknesses = trainer.train()
     weld_info = {}
@@ -162,6 +164,7 @@ def run_pipeline(args):
     # -- metrics on the held-out test views (and on the true surface when the dataset has it) --
     clip_model = criterion.loss_mapper["clip"].model
     metrics = {"test_loss": trainer.test_loss, "n_curves_init": args.n_curves,
+               "batches_trained": trainer.stopped_at or trainer.total_batches, "best_val_loss": trainer.best_val if trainer.best_val != float("inf") else None,
                "n_curves_final": len(curve_set.curves),
                **evaluate_views(curve_set, rasterizer, test_sampler, clip_model, args.width, args.height, invert)}
     metrics.update(connectivity_stats(curve_set, contact_eps))

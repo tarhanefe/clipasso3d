@@ -1,17 +1,23 @@
 #!/bin/bash
-# Main ablations: number of lines x abstraction, one job list per object (one pod per object).
-# Fixed for all runs: thickness 0.008, black strokes on white, visual-hull initialization, 8 different
-# views per step for 150 epochs (1950 steps), all curves sampled at once with adaptive density.
-# Curves that end up off the object (outside the visual hull) or collapse are deleted from 25% of
-# training on, every 10% (start 490, every 195); metrics.json reports n_curves_final.
+# Main ablation: number of lines x abstraction level, on every rendered object.
+# One shared job list (jobs/ablation/all.jsonl) that any number of pods/GPUs/workers work through.
+#
+# Fixed for all runs (the run.py defaults): thickness 0.008, black strokes on white, visual-hull
+# initialization, 8 different views per step, all curves sampled at once with adaptive density,
+# no connectivity constraint. Curves that end up off the object (outside the visual hull) or collapse
+# are deleted from batch 490 on, every 195 batches; metrics.json reports n_curves_final.
+# Each run stops when the validation loss (every 100 batches) has not improved by 0.5% for 5
+# validations, after at least 500 and at most 7800 batches (600 epochs).
 #
 # Abstraction = balance of CLIPasso's two losses (no extra semantic CLIPLoss, --clip_weight 0):
-#   geometric: L2 between CLIP ViT layers 2,3 of sketch and target (per-layer weights below)
+#   geometric: L2 between CLIP ViT layers 2,3 of sketch and target (per-layer weights)
 #   semantic:  cosine distance of the final CLIP embeddings (--clip_fc_loss_weight)
-#   exact          geometric 1.0, semantic 0      strokes follow the contours
-#   normal         geometric 1.0, semantic 0.1    CLIPasso default
-#   abstract       geometric 1.0, semantic 1.0
-#   very_abstract  geometric 0.1, semantic 1.0
+#                       geometric  semantic  semantic/geometric
+#   too_geometric          1.0       0          0
+#   middle_geometric       1.0       0.02       0.02
+#   normal                 1.0       0.1        0.1     (CLIPasso)
+#   middle_abstract        1.0       1.0        1
+#   too_abstract           0.1       1.0        10
 #
 # Usage (bash >= 4, on the pods): experiments/ablation.sh [objects...]   (default: all of data/objaverse)
 set -euo pipefail
@@ -21,25 +27,28 @@ if [ ${#OBJECTS[@]} -eq 0 ]; then
   for d in data/objaverse/*/; do [ -f "$d/transforms_test.json" ] && OBJECTS+=("$(basename "$d")"); done
 fi
 WANDB=(--wandb --wandb_mode offline --wandb_entity efe-tarhan-epfl --wandb_project clipasso3d)
-BASE=${BASE:-"--epochs 150 --batch_size 8 --inner_steps 1 --frame_every 10 --eval_interval 100 --init hull --length 0.15 --style black_on_white --sample_spacing 0.5"}
-PRUNE=${PRUNE:-"--prune_start 490 --prune_every 195"}
-COMMON=(--thickness 0.008 --rasterizer sparse --clip_weight 0 --gif_fps 30 --rotation_time 6 "${WANDB[@]}")
-LINES=(10 20 50 100 200 500 1000)
+STOP=(--epochs 600 --eval_interval 100 --early_stop_patience 5 --early_stop_tol 0.005 --min_batches 500)
+PRUNE=(--prune_start 490 --prune_every 195)
+COMMON=(--thickness 0.008 --snapshot_every 20 --frame_every 10 --gif_fps 30 --rotation_time 6
+        "${STOP[@]}" "${PRUNE[@]}" "${WANDB[@]}")
+LINES=(5 10 20 50 100 200)
+LEVELS=(too_geometric middle_geometric normal middle_abstract too_abstract)
 declare -A ABS=(
-  [exact]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 0"
+  [too_geometric]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 0"
+  [middle_geometric]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 0.02"
   [normal]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 0.1"
-  [abstract]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 1.0"
-  [very_abstract]="--clip_conv_layer_weights 0 0 0.1 0.1 0 --clip_fc_loss_weight 1.0"
+  [middle_abstract]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 1.0"
+  [too_abstract]="--clip_conv_layer_weights 0 0 0.1 0.1 0 --clip_fc_loss_weight 1.0"
 )
 mkdir -p jobs/ablation
-for obj in "${OBJECTS[@]}"; do
-  out="jobs/ablation/${obj//[()]/}.jsonl"; rm -f "$out"
-  for level in normal exact abstract very_abstract; do
-    for n in "${LINES[@]}"; do
+out=jobs/ablation/all.jsonl; rm -f "$out"
+for level in "${LEVELS[@]}"; do
+  for n in "${LINES[@]}"; do
+    for obj in "${OBJECTS[@]}"; do
       # shellcheck disable=SC2086
       python tools/sweep.py make --datasets "data/objaverse/$obj" --run_name "abl_L${n}_${level}" \
-        --runs_root runs --out "$out" --append -- "${COMMON[@]}" $BASE $PRUNE --n_curves "$n" ${ABS[$level]} >/dev/null
+        --runs_root runs --out "$out" --append -- "${COMMON[@]}" --n_curves "$n" ${ABS[$level]} >/dev/null
     done
   done
-  echo "$out: $(wc -l < "$out") jobs"
 done
+echo "$out: $(wc -l < "$out") jobs (${#OBJECTS[@]} objects x ${#LINES[@]} line counts x ${#LEVELS[@]} levels)"
