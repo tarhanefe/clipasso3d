@@ -39,7 +39,7 @@ def main():
     p.add_argument("--out", required=True)
     p.add_argument("--size", type=int, default=512)
     p.add_argument("--zoom", type=float, default=1.3)
-    p.add_argument("--stroke", type=float, default=3.0, help="Stroke width in pixels of a --size image")
+    p.add_argument("--stroke", type=float, default=6.0, help="Stroke width in pixels of a --size image")
     args = p.parse_args()
 
     cams = json.load(open(os.path.join(args.turntable, "cameras.json")))
