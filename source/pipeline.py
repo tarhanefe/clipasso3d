@@ -120,7 +120,7 @@ def run_pipeline(args):
         curves = random_short_lines(center_t, args.n_curves, args.radius, args.length, device)
 
     curve_set = CurveSet(curves, args.thickness, args.overlap, arc_samples=300, device=device,
-                         samples_per_curve=args.samples_per_curve).to(device)
+                         samples_per_curve=args.samples_per_curve, sample_spacing=args.sample_spacing).to(device)
     optimizer = torch.optim.Adam(curve_set.parameters(), lr=args.learning_rate)
 
     contact_eps = args.connect_eps or 2 * args.thickness

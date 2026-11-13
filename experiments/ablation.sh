@@ -20,7 +20,7 @@ if [ ${#OBJECTS[@]} -eq 0 ]; then
   for d in data/objaverse/*/; do [ -f "$d/transforms_test.json" ] && OBJECTS+=("$(basename "$d")"); done
 fi
 WANDB=(--wandb --wandb_mode offline --wandb_entity efe-tarhan-epfl --wandb_project clipasso3d)
-BASE=${BASE:-"--epochs 120 --batch_size 4 --inner_steps 1 --frame_every 15 --samples_per_curve 128 --init hull --length 0.15 --style black_on_white"}
+BASE=${BASE:-"--epochs 120 --batch_size 4 --inner_steps 1 --frame_every 15 --init hull --length 0.15 --style black_on_white"}
 PRUNE=${PRUNE:-"--prune_start 750 --prune_every 300"}
 COMMON=(--thickness 0.008 --rasterizer sparse --clip_weight 0 --gif_fps 30 --rotation_time 6 "${WANDB[@]}")
 LINES=(10 20 50 100 200 500 1000)

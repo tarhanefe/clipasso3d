@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument('--ckpt_every', type=int, default=20, help='Checkpoint every N batches')
     parser.add_argument('--frame_every', type=int, default=1, help='Save a render|target frame every N batches')
     parser.add_argument('--no_compile', action='store_true', help='Skip torch.compile (CPU smoke tests)')
-    parser.add_argument('--rasterizer', type=str, default='dense', choices=['dense', 'sparse'],
+    parser.add_argument('--rasterizer', type=str, default='sparse', choices=['sparse', 'dense'],
                         help='dense: every sphere at every pixel; sparse: +-4 sigma window per sphere (needed for many curves)')
 
     # Curve parameters
@@ -37,8 +37,11 @@ def parse_args():
     parser.add_argument('--radius', type=float, default=0.8)
     parser.add_argument('--length', type=float, default=0.15, help='Length of each initial line')
     parser.add_argument('--overlap', type=float, default=0.6)
+    parser.add_argument('--sample_spacing', type=float, default=0.5,
+                        help='Spheres along each curve at most this many thicknesses apart, so strokes stay continuous '
+                             'at any length (0 = use --samples_per_curve)')
     parser.add_argument('--samples_per_curve', type=int, default=0,
-                        help='Spheres per curve (0 = derived from length/thickness/overlap, the original behaviour)')
+                        help='With --sample_spacing 0: fixed spheres per curve, or 0 = from length/thickness/overlap (original)')
     parser.add_argument('--init', type=str, default='hull', choices=['hull', 'sphere'],
                         help='hull: spread over the visual hull surface of the training masks; sphere: random short lines on a sphere of --radius')
     parser.add_argument('--hull_grid', type=int, default=64, help='Voxel grid resolution of the visual hull')

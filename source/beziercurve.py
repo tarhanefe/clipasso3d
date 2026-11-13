@@ -96,9 +96,13 @@ class CurveSet(nn.Module):
         thickness and overlap (original behaviour; the total changes every step).
     samples_per_curve = S > 0: every curve gets exactly S spheres spaced uniformly in arc
         length, computed for all curves at once (fixed shape, much faster with torch.compile).
+        Long curves get sparse and look dotted when S * spacing is too small.
+    sample_spacing = k > 0 (takes precedence): every curve gets as many spheres as its length
+        needs for a spacing of at most k * thickness (the Gaussian sigma), computed for all
+        curves at once. k = 0.5 gives continuous strokes of any length.
     """
     def __init__(self, init_pts_list, thickness=0.02, overlap=0.8, arc_samples=300, device='cuda',
-                 samples_per_curve: int = 0):
+                 samples_per_curve: int = 0, sample_spacing: float = 0.0, max_samples: int = 4096):
         super().__init__()
         self.curves = nn.ModuleList([
             BezierCurve(pts.to(device), thickness, overlap, arc_samples, device=device)
@@ -107,6 +111,8 @@ class CurveSet(nn.Module):
         self.device = device
         self.thickness = float(thickness)
         self.samples_per_curve = int(samples_per_curve)
+        self.sample_spacing = float(sample_spacing)
+        self.max_samples = int(max_samples)
         # persistent id of each curve (kept through pruning, used by training snapshots)
         self.ids = list(range(len(self.curves)))
 
@@ -120,6 +126,44 @@ class CurveSet(nn.Module):
         t = t.view(-1, 1)
         coefs = ref.binoms * t ** ref.idxs * (1 - t) ** (ref.deg - ref.idxs)   # (T,N)
         return torch.einsum('tn,cnk->ctk', coefs, self.control_points())
+
+    def _arc_samples(self, n_per_curve=None):
+        """
+        Points uniformly spaced in arc length on every curve, all curves at once.
+        n_per_curve: fixed count, or None for the adaptive count from `sample_spacing`.
+        Returns (points (C,S_max,3), valid mask (C,S_max)).
+        """
+        P = torch.stack([c.P for c in self.curves])                    # (C,N,3)
+        ref = self.curves[0]
+        C = P.size(0)
+        t = ref.t_dense.unsqueeze(1)                                   # (D,1)
+        coefs = ref.binoms * t ** ref.idxs * (1 - t) ** (ref.deg - ref.idxs)   # (D,N)
+        pts = torch.einsum('dn,cnk->cdk', coefs, P)                    # (C,D,3)
+        seg = (pts[:, 1:] - pts[:, :-1]).norm(dim=-1)                  # (C,D-1)
+        cumlen = torch.cat([seg.new_zeros(C, 1), seg.cumsum(1)], 1)    # (C,D)
+        L = cumlen[:, -1]
+        if n_per_curve is None:
+            sep = self.sample_spacing * self.thickness
+            S_i = (torch.ceil(L.detach() / sep).long() + 1).clamp(2, self.max_samples)
+        else:
+            S_i = torch.full((C,), int(n_per_curve), device=P.device, dtype=torch.long)
+        S = int(S_i.max())
+        k = torch.arange(S, device=P.device)
+        valid = k[None, :] < S_i[:, None]                              # (C,S)
+        frac = torch.minimum(k[None, :], S_i[:, None] - 1).to(P.dtype) / (S_i[:, None] - 1).to(P.dtype)
+        s_des = frac * L[:, None]                                      # (C,S)
+        idx = torch.searchsorted(cumlen.detach().contiguous(), s_des.detach().contiguous())
+        idx = idx.clamp(1, cumlen.size(1) - 1)
+        c0, c1 = cumlen.gather(1, idx - 1), cumlen.gather(1, idx)
+        t0, t1 = ref.t_dense[idx - 1], ref.t_dense[idx]
+        t_samp = (t0 + (t1 - t0) * ((s_des - c0) / (c1 - c0).clamp_min(1e-12))).unsqueeze(-1)  # (C,S,1)
+        coefs = ref.binoms * t_samp ** ref.idxs * (1 - t_samp) ** (ref.deg - ref.idxs)          # (C,S,N)
+        return torch.einsum('csn,cnk->csk', coefs, P), valid
+
+    def _forward_adaptive(self):
+        pts, valid = self._arc_samples()
+        means = pts[valid]                                             # (M,3)
+        return means, means.new_full((means.size(0),), self.thickness)
 
     def _forward_fixed(self):
         P = torch.stack([c.P for c in self.curves])                    # (C,N,3)
@@ -144,6 +188,8 @@ class CurveSet(nn.Module):
         return means, thicknesses
 
     def forward(self):
+        if self.sample_spacing > 0:
+            return self._forward_adaptive()
         if self.samples_per_curve > 0:
             return self._forward_fixed()
         means_list, th_list = [], []
@@ -157,6 +203,9 @@ class CurveSet(nn.Module):
 
     def curve_samples(self):
         """Sample points of each curve as a list of (S_i,3) tensors (what forward() renders)."""
+        if self.sample_spacing > 0:
+            pts, valid = self._arc_samples()
+            return [p[v] for p, v in zip(pts, valid)]
         if self.samples_per_curve > 0:
             means, _ = self._forward_fixed()
             return list(means.view(len(self.curves), self.samples_per_curve, 3))

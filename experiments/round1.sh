@@ -4,7 +4,7 @@
 # (weight 1) + 0.1 x semantic fc loss, and no extra semantic CLIPLoss (--clip_weight 0).
 #   A_repo    the repository's original settings, including its loss (extra CLIPLoss, weight 1): reference
 #   B_clipasso A_repo with CLIPasso's loss balance
-#   C_fixed   B + 128 spheres per curve, batched (speed; should not change quality)
+#   C_fixed   B + batched sampling with adaptive density (0.5 x thickness spacing: speed, continuous long strokes)
 #   D_bw      C + black strokes on white
 #   E_hull    C + visual-hull initialization (longer initial strokes)
 #   F_mv      C + 4 views per step, 1 step per batch
@@ -18,9 +18,9 @@ OBJECTS=("$@"); [ ${#OBJECTS[@]} -gt 0 ] || OBJECTS=("car_(automobile)" airplane
 WANDB=(--wandb --wandb_mode offline --wandb_entity efe-tarhan-epfl --wandb_project clipasso3d)
 COMMON=(--n_curves 25 --thickness 0.008 --gif_fps 30 --rotation_time 6 "${WANDB[@]}")
 CLIPASSO=(--clip_weight 0 --clip_conv_loss 1 --clip_fc_loss_weight 0.1 --clip_conv_layer_weights 0 0 1 1 0)
-OLD=(--epochs 10 --batch_size 1 --inner_steps 30 --frame_every 5 --init sphere --length 0.02)
-MV=(--epochs 120 --batch_size 4 --inner_steps 1 --frame_every 15 --init sphere --length 0.02)
-FIX=(--samples_per_curve 128)
+OLD=(--epochs 10 --batch_size 1 --inner_steps 30 --frame_every 5 --init sphere --length 0.02 --sample_spacing 0)
+MV=(--epochs 120 --batch_size 4 --inner_steps 1 --frame_every 15 --init sphere --length 0.02 --sample_spacing 0)
+FIX=(--sample_spacing 0.5)
 HULL=(--init hull --length 0.15)
 BW=(--style black_on_white)
 
