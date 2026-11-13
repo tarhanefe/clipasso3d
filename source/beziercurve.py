@@ -107,6 +107,19 @@ class CurveSet(nn.Module):
         self.device = device
         self.thickness = float(thickness)
         self.samples_per_curve = int(samples_per_curve)
+        # persistent id of each curve (kept through pruning, used by training snapshots)
+        self.ids = list(range(len(self.curves)))
+
+    def control_points(self):
+        """(C,N,3) control points of all curves."""
+        return torch.stack([c.P for c in self.curves])
+
+    def points_at(self, t: torch.Tensor):
+        """Points of every curve at parameters t (T,): (C,T,3), differentiable."""
+        ref = self.curves[0]
+        t = t.view(-1, 1)
+        coefs = ref.binoms * t ** ref.idxs * (1 - t) ** (ref.deg - ref.idxs)   # (T,N)
+        return torch.einsum('tn,cnk->ctk', coefs, self.control_points())
 
     def _forward_fixed(self):
         P = torch.stack([c.P for c in self.curves])                    # (C,N,3)
@@ -152,12 +165,14 @@ class CurveSet(nn.Module):
     def keep_curves(self, keep):
         """Keep only the curves whose entry in `keep` (list of bools) is True."""
         self.curves = nn.ModuleList([c for c, k in zip(self.curves, keep) if k])
+        self.ids = [i for i, k in zip(self.ids, keep) if k]
 
     def load_state_dict(self, state_dict, strict=True, assign=False):
         # a checkpoint taken after pruning has fewer curves than the freshly initialized set
         n = len({k.split('.')[1] for k in state_dict if k.startswith('curves.')})
         if n < len(self.curves):
             self.curves = nn.ModuleList(list(self.curves)[:n])
+            self.ids = self.ids[:n]          # the trainer restores the real ids from its checkpoint
         return super().load_state_dict(state_dict, strict, assign)
 
     def remove_curve(self, idx):

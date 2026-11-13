@@ -16,6 +16,7 @@ from source.imagesampler import ImageSampler
 from source.initalizer import random_short_lines, hull_short_lines
 from source.metrics import evaluate_views, chamfer_to_surface
 from source.trainer import Trainer
+from source.connectivity import ConnectivityLoss, connectivity_stats, weld
 
 
 def seed_everything(seed):
@@ -122,6 +123,8 @@ def run_pipeline(args):
                          samples_per_curve=args.samples_per_curve).to(device)
     optimizer = torch.optim.Adam(curve_set.parameters(), lr=args.learning_rate)
 
+    contact_eps = args.connect_eps or 2 * args.thickness
+    connect_loss = ConnectivityLoss(args.connect_weight, contact_eps) if args.connect_weight > 0 else None
     wandb_run = init_wandb(args, out_dir) if args.wandb else None
     trainer = Trainer(train_sampler, val_sampler, test_sampler, curve_set, rasterizer, criterion, optimizer,
                       batch_size=args.batch_size, inner_steps=args.inner_steps, epochs=args.epochs,
@@ -132,13 +135,25 @@ def run_pipeline(args):
                       frame_every=args.frame_every, log_path=str(out_dir / "log.jsonl"),
                       wandb_run=wandb_run, invert=invert,
                       prune_every=args.prune_every, prune_start=args.prune_start,
-                      prune_min_on_frac=args.prune_min_on_frac, prune_min_length=args.prune_min_length)
+                      prune_min_on_frac=args.prune_min_on_frac, prune_min_length=args.prune_min_length,
+                      n_snapshots=args.n_snapshots, connect_loss=connect_loss, connect_start=args.connect_start)
 
     means, thicknesses = trainer.train()
+    weld_info = {}
+    if connect_loss is not None:
+        # guarantee one buildable piece: translate leftover separate clusters onto the main one
+        n_moved, dist = weld(curve_set, contact_eps)
+        weld_info = {"weld_clusters_moved": n_moved, "weld_total_shift": dist}
+        print(f"Weld: moved {n_moved} clusters by {dist:.4f} in total")
+        trainer.snapshot(trainer.total_batches + 1)
+        with torch.no_grad():
+            means, thicknesses = curve_set()
+    trainer.save_snapshots(str(out_dir / "curves_history.npz"))
 
     # -- final curves --
     torch.save({
         'control_points': [c.P.detach().cpu() for c in curve_set.curves],
+        'curve_ids': list(curve_set.ids),
         'means': means.cpu(), 'thicknesses': thicknesses.cpu(),
         'scene_center': train_sampler.scene_center, 'K': train_sampler.K.cpu(),
     }, out_dir / 'curves.pt.tmp')
@@ -149,6 +164,8 @@ def run_pipeline(args):
     metrics = {"test_loss": trainer.test_loss, "n_curves_init": args.n_curves,
                "n_curves_final": len(curve_set.curves),
                **evaluate_views(curve_set, rasterizer, test_sampler, clip_model, args.width, args.height, invert)}
+    metrics.update(connectivity_stats(curve_set, contact_eps))
+    metrics.update(weld_info)
     surface = base / "surface_points.npy"
     if surface.exists():
         metrics.update(chamfer_to_surface(means, torch.from_numpy(np.load(surface))))

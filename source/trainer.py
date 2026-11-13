@@ -50,6 +50,9 @@ class Trainer:
         prune_start: int = 0,
         prune_min_on_frac: float = 0.5,
         prune_min_length: float = 0.005,
+        n_snapshots: int = 100,
+        connect_loss=None,
+        connect_start: int = 0,
     ):
         self.train_sampler = train_sampler
         self.val_sampler = val_sampler
@@ -81,11 +84,18 @@ class Trainer:
         self.prune_start = prune_start
         self.prune_min_on_frac = prune_min_on_frac
         self.prune_min_length = prune_min_length
+        # snapshots of all control points during training (for the interactive 4D viewer)
+        self.n_snapshots = n_snapshots
+        self.snapshots = []          # list of (batch, curve ids, control points float16 (C,N,3))
+        # optional extra loss on the curve set (e.g. connectivity), added from batch `connect_start`
+        self.connect_loss = connect_loss
+        self.connect_start = connect_start
 
         # training schedule
         self.N_train = len(train_sampler)
         self.updates_per_epoch = math.ceil(self.N_train / self.batch_size)
         self.total_batches = self.updates_per_epoch * self.epochs
+        self.snapshot_every = max(1, self.total_batches // self.n_snapshots) if self.n_snapshots else 0
 
         # metrics tracking
         self.batch_indices = []
@@ -108,6 +118,8 @@ class Trainer:
             "train_losses": self.train_losses,
             "val_batches": self.val_batches,
             "val_losses": self.val_losses,
+            "curve_ids": self.curve_set.ids,
+            "snapshots": self.snapshots,
             "rng_python": random.getstate(),
             "rng_numpy": np.random.get_state(),
             "rng_torch": torch.get_rng_state(),
@@ -129,6 +141,8 @@ class Trainer:
             return 0
         state = torch.load(self.ckpt_path, map_location=self.device, weights_only=False)
         self.curve_set.load_state_dict(state["curve_set"])      # also drops curves pruned before
+        self.curve_set.ids = list(state.get("curve_ids", self.curve_set.ids))
+        self.snapshots = state.get("snapshots", [])
         self.optimizer = rebuild_optimizer(self.optimizer, list(self.curve_set.parameters()))
         self.optimizer.load_state_dict(state["optimizer"])
         self.batch_indices = state["batch_indices"]
@@ -152,6 +166,26 @@ class Trainer:
         entry["time"] = time.time()
         with open(self.log_path, "a") as f:
             f.write(json.dumps(entry) + "\n")
+
+    @torch.no_grad()
+    def snapshot(self, batch):
+        if self.snapshots and self.snapshots[-1][0] == batch:
+            return
+        P = self.curve_set.control_points().detach().cpu().to(torch.float16).numpy()
+        self.snapshots.append((batch, list(self.curve_set.ids), P))
+
+    def save_snapshots(self, path):
+        """Training history as npz: batches (T,), offsets (T+1,), ids (sum C,), P (sum C,N,3) float16."""
+        if not self.snapshots:
+            return
+        batches = np.array([b for b, _, _ in self.snapshots], dtype=np.int32)
+        counts = [len(ids) for _, ids, _ in self.snapshots]
+        offsets = np.concatenate([[0], np.cumsum(counts)]).astype(np.int64)
+        ids = np.concatenate([np.asarray(i, dtype=np.int32) for _, i, _ in self.snapshots])
+        P = np.concatenate([p for _, _, p in self.snapshots])
+        tmp = path + ".tmp.npz"
+        np.savez_compressed(tmp, batches=batches, offsets=offsets, ids=ids, P=P)
+        os.replace(tmp, path)
 
     def to_image(self, alpha):
         """(H,W,1) stroke coverage -> (1,3,H,W) sketch image."""
@@ -233,6 +267,8 @@ class Trainer:
             self._init_display()
 
         self.start_batch = self.resume()
+        if self.snapshot_every and not self.snapshots:
+            self.snapshot(0)                                    # initialization
         for batch_idx in range(self.start_batch, self.total_batches):
             # sample batch
             batch = [self.train_sampler.sample(random.randrange(self.N_train))
@@ -252,6 +288,10 @@ class Trainer:
                     it = batch_idx * self.inner_steps
                     losses.append(self.criterion(render, rgb, it))
                 train_loss_tensor = torch.stack(losses).mean()
+                connect = None
+                if self.connect_loss is not None and batch_idx >= self.connect_start:
+                    connect = self.connect_loss(self.curve_set)
+                    train_loss_tensor = train_loss_tensor + connect
                 train_loss = train_loss_tensor.item()
                 train_loss_tensor.backward()
                 self.optimizer.step()
@@ -287,8 +327,11 @@ class Trainer:
             if self.save_dir and batch_idx % self.frame_every == 0:
                 self._save_frame(batch_idx, render, batch[0][0])
 
+            if self.snapshot_every and ((batch_idx + 1) % self.snapshot_every == 0 or batch_idx == self.total_batches - 1):
+                self.snapshot(batch_idx + 1)
             self.log(batch=batch_idx + 1, total=self.total_batches, train_loss=train_loss, val_loss=val_loss,
-                     n_curves=len(self.curve_set.curves), n_pruned=n_pruned)
+                     n_curves=len(self.curve_set.curves), n_pruned=n_pruned,
+                     connect_loss=None if connect is None else connect.item())
             if (batch_idx + 1) % self.ckpt_every == 0 or batch_idx == self.total_batches - 1:
                 self.save_checkpoint(batch_idx + 1)
 
