@@ -173,7 +173,7 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 sys.path.append("..")
-from source.utils import load_scene, load_rgb
+from source.utils import load_scene, load_rgb, load_mask
 
 
 class ImageSampler:
@@ -210,6 +210,7 @@ class ImageSampler:
         # load and resize images
         to_tensor = T.ToTensor()
         self.images = []
+        self.masks = []    # (1,1,H,W) object masks, used by the evaluation metrics
         for fp in file_paths:
             cleaned = fp.lstrip("./")
             rel_dir, stem = os.path.split(cleaned)
@@ -225,6 +226,7 @@ class ImageSampler:
 
             t = to_tensor(img).unsqueeze(0).to(device)
             self.images.append(t)
+            self.masks.append(torch.from_numpy(load_mask(candidate, width, height))[None, None].to(device))
 
     def sample(self, idx: int):
         """

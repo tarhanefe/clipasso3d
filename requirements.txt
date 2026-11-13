@@ -9,3 +9,8 @@ scikit-learn
 tqdm
 regex
 plotly
+# optional: experiment tracking (run.py --wandb)
+wandb
+# optional: data tools (tools/check_poses.py, tools/fetch_objaverse.py)
+OpenEXR
+objaverse

@@ -8,10 +8,16 @@ def rasterize_spheres(
     K: torch.Tensor,
     width: int,
     height: int,
+    near: float = 1e-3,
 ) -> torch.Tensor:
     """
     Efficient differentiable rasterizer for spheres using Gaussian splatting.
     Optimized for memory by removing intermediate large tensors.
+
+    Camera convention is OpenGL/Blender (as in NeRF transforms.json): the camera looks
+    along -Z with +Y up, so a point in front of the camera has z_cam < 0. Pixel (row i,
+    col j) has its center at (j + 0.5, i + 0.5), row 0 is the top of the image.
+    Spheres behind the camera (or closer than `near`) are not drawn.
     """
     device, dtype = means.device, means.dtype
     N = means.shape[0]
@@ -31,39 +37,31 @@ def rasterize_spheres(
     homog = torch.cat([means, ones], dim=1)
     cam_h = (viewmat @ homog.T).T
     cam_pts = cam_h[:, :3] / cam_h[:, 3:4]
-    z_cam = cam_pts[:, 2]
+    depth = -cam_pts[:, 2]                          # > 0 in front of the camera
+    visible = depth > near
+    depth = torch.where(visible, depth, torch.ones_like(depth))
 
-    # -- 2. Project to image plane --
-    f = K[0, 0]
-    r_px = f * R_world / z_cam  # pixel-space radii
-    proj = (K @ cam_pts.T).T
-    means2D = proj[:, :2] / proj[:, 2:3]  # (N,2)
+    # -- 2. Project to image plane (OpenGL camera -> image with rows going down) --
+    fx, fy, cx, cy = K[0, 0], K[1, 1], K[0, 2], K[1, 2]
+    r_px = fx * R_world / depth  # pixel-space radii
+    mu_x = (cx + fx * cam_pts[:, 0] / depth).view(1, 1, -1)  # (1,1,N)
+    mu_y = (cy - fy * cam_pts[:, 1] / depth).view(1, 1, -1)  # (1,1,N)
 
-    # -- 3. Build pixel grid --
-    #ys = torch.arange(height, device=device, dtype=dtype)
-    #xs = torch.arange(width, device=device, dtype=dtype)
-    #yy, xx = torch.meshgrid(ys, xs, indexing='ij')  # (H,W)
-    xs = torch.arange(width-1, -1,    -1, device=device, dtype=dtype)
-    ys = torch.arange(height,    device=device, dtype=dtype)
+    # -- 3. Build pixel grid (pixel centers) --
+    xs = torch.arange(width, device=device, dtype=dtype) + 0.5
+    ys = torch.arange(height, device=device, dtype=dtype) + 0.5
     yy, xx = torch.meshgrid(ys, xs, indexing='ij')
-    pix_x = xx.unsqueeze(-1).unsqueeze(-1)  # (H,W,1,1)
-    pix_y = yy.unsqueeze(-1).unsqueeze(-1)  # (H,W,1,1)
+    pix_x = xx.unsqueeze(-1)  # (H,W,1)
+    pix_y = yy.unsqueeze(-1)  # (H,W,1)
 
-    mu_x = means2D[:, 0].view(1, 1, -1, 1)  # (1,1,N,1)
-    mu_y = means2D[:, 1].view(1, 1, -1, 1)  # (1,1,N,1)
+    dx = pix_x - mu_x  # (H,W,N)
+    dy = pix_y - mu_y  # (H,W,N)
 
-    dx = pix_x - mu_x  # (H,W,N,1)
-    dy = pix_y - mu_y  # (H,W,N,1)
-
-    inv_var = 1.0 / (r_px**2 + 1e-8)  # avoid divide-by-zero
-    inv_cov_xx = inv_var.view(1,1,-1,1)
-    inv_cov_yy = inv_var.view(1,1,-1,1)
-
-    m2 = (dx * dx * inv_cov_xx) + (dy * dy * inv_cov_yy)  # (H,W,N,1)
-    m2 = m2.squeeze(-1)
+    inv_var = (1.0 / (r_px**2 + 1e-8)).view(1, 1, -1)  # avoid divide-by-zero
+    m2 = (dx * dx + dy * dy) * inv_var  # (H,W,N)
 
     # -- 4. Composite Gaussian spheres into image --
-    w = torch.exp(-0.5 * m2)
+    w = torch.exp(-0.5 * m2) * visible.to(dtype).view(1, 1, -1)
     alpha = 1 - torch.prod(1 - w + 1e-10, dim=2)  # (H,W)
 
     return alpha.unsqueeze(-1) # (H,W,1)

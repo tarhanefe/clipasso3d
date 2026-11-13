@@ -13,11 +13,12 @@ meshes/
 │       ├── lamp.obj
 │       ├── lamp.mtl
 │       └── lamp_diffuse.png
+├── objaverse_selection.json   the project's Objaverse objects (ids + attribution, committed)
 └── objaverse/             downloaded by tools/fetch_objaverse.py (+ manifest.json)
 ```
 
-Mesh files and rendered data are git-ignored: they are large, and most licenses require
-attribution (kept in `manifest.json` for Objaverse objects).
+Mesh files and rendered data are git-ignored (large, and licensed by their authors); only this
+README and the selection list are in the repository.
 
 ## 1. Get a mesh
 
@@ -30,19 +31,27 @@ Blender's Z-up automatically.
 `render_all.sh` (step 2) picks up mesh files directly inside the folder you give it, so for an
 `.obj` in its own subfolder render it with `render_mesh.py` directly.
 
-**From Objaverse.** Downloads one simple, CC-BY/CC0 object per category (20 by default:
-cars, trucks, planes, chairs, mugs, ...):
+**From Objaverse (the project's object set).** The 20 objects used in the project (cars, trucks,
+planes, chairs, mugs, ...; all CC-BY or CC0) are listed in `meshes/objaverse_selection.json`
+together with their authors and sources. This downloads exactly them into `meshes/objaverse/`:
 
 ```bash
 pip install objaverse
-python tools/fetch_objaverse.py --out meshes/objaverse
-python tools/fetch_objaverse.py --out meshes/objaverse --categories teapot guitar          # only some
-python tools/fetch_objaverse.py --out meshes/objaverse --swap "car_(automobile)" bicycle   # replace bad picks
+python tools/fetch_objaverse.py --out meshes/objaverse --selection meshes/objaverse_selection.json
 ```
 
-Picks are filtered by license, polygon count (1k–60k faces) and animation, and ranked by
-Sketchfab likes. Look at the previews before training: some objects come with a ground
-plate, a shadow plane or are unfinished. `--swap` replaces a pick with the next backup.
+**Picking new Objaverse objects.** Without `--selection`, one object per LVIS category is picked
+automatically (filtered by license, 1k–60k faces and no animation, ranked by Sketchfab likes):
+
+```bash
+python tools/fetch_objaverse.py --out meshes/objaverse --categories teapot guitar          # only some
+python tools/fetch_objaverse.py --out meshes/objaverse --swap "car_(automobile)" bicycle   # replace bad picks
+python tools/fetch_objaverse.py --out meshes/objaverse --write_selection meshes/objaverse_selection.json
+```
+
+Look at the renders before training: some objects come with a ground plate, a shadow plane or
+are unfinished. `--swap` replaces a pick with the next backup, and `--write_selection` saves the
+current picks so others download the same set.
 
 ## 2. Render
 

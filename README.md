@@ -59,7 +59,7 @@ Use ```WireframeTrial.ipynb```  notebook inside the notebooks folder to interact
   cd clipasso3d
   python run.py \
   --data_name rose \
-  --save_dir training_frames \
+  --run_name default \
   --output_gif training_evolution.gif \
   --batch_size 1 \
   --epochs 10 \
@@ -85,9 +85,10 @@ where
 
 | Argument                     | Description                                                                 |
 |-----------------------------|-----------------------------------------------------------------------------|
-| `--data_name`               | Name of dataset folder inside `../data/` (e.g., `rose`).                    |
-| `--save_dir`                | Directory to save per-batch visualization frames.                           |
-| `--output_gif`              | Path to save the training evolution GIF.                                    |
+| `--data_name`               | Dataset folder inside `--data_root` (default `data/`), e.g. `rose` or `objaverse/teapot`. |
+| `--run_name`                | Name of the configuration; outputs go to `runs/<data_name>/<run_name>/` (or `--out_dir`). |
+| `--seed`                    | Random seed (curve initialization, view sampling, augmentations).           |
+| `--output_gif`              | Training evolution GIF name inside the run folder.                          |
 | `--batch_size`              | Number of images processed per training batch.                              |
 | `--epochs`                  | Number of training epochs.                                                  |
 | `--inner_steps`             | Inner optimization steps per batch.                                         |
@@ -107,6 +108,37 @@ where
 | `--output_semigif`          | Output path for the 3D rendered semihelical GIF animation.                  |
 
 ---
+
+### Outputs, checkpoints and resuming
+
+Each run writes to its own folder `runs/<data_name>/<run_name>/`: `config.json` (arguments and git
+commit), `ckpt.pt` (saved every `--ckpt_every` batches), `log.jsonl` (one line per batch),
+`frames/`, `curves.pt`, `metrics.json`, the two GIFs and finally `DONE`. Running the same command
+again resumes from the checkpoint (bit-exact) or skips the run if it is finished.
+
+`metrics.json` is computed on the held-out test views: `clip_similarity` (CLIP ViT-B/32 cosine
+similarity between render and photo), `silhouette_precision` (fraction of stroke ink on the object)
+and, for rendered meshes, `accuracy` / `completeness` / `chamfer` (distances between the curves and
+the true surface, in units of the unit sphere).
+
+Optional Weights & Biases logging: `--wandb [--wandb_project clipasso3d] [--wandb_entity ...]`.
+A restarted run continues the same wandb run; `--wandb_mode offline` logs into the run folder for
+machines without internet (upload later with `wandb sync runs/.../wandb/offline-run-*`).
+
+### Many runs on many GPUs
+
+```bash
+# one job per dataset; arguments after -- go to run.py
+python tools/sweep.py make --datasets data/objaverse/* --run_name baseline --out jobs/baseline.jsonl -- --epochs 10
+# start one worker per GPU (any number of pods); workers share jobs through the file system
+CUDA_VISIBLE_DEVICES=0 python tools/sweep.py run --jobs jobs/baseline.jsonl --worker 0 --nworkers 2
+CUDA_VISIBLE_DEVICES=1 python tools/sweep.py run --jobs jobs/baseline.jsonl --worker 1 --nworkers 2
+# progress: jobs done / total, running workers, failures, ETA, best results
+python tools/status.py jobs/baseline.jsonl
+```
+
+Workers claim jobs atomically, refresh a heartbeat and take over jobs of workers that died; a job
+that keeps failing is marked `FAILED`, and CUDA errors make the worker exit so a fresh process retries.
 
 ## 3- Train on your own meshes or Objaverse objects
 

@@ -67,3 +67,22 @@ def load_rgb(path: str, width: int, height: int, background=(0, 0, 0)):
     if img.size != (width, height):
         img = img.resize((width, height), Image.LANCZOS)
     return img
+
+
+def load_mask(path: str, width: int, height: int):
+    """
+    Object mask in [0,1] at (width, height): the alpha channel for images with a transparent
+    background, otherwise non-black pixels (the original datasets have an opaque black background).
+    """
+    import numpy as np
+    from PIL import Image
+
+    img = Image.open(path).convert("RGBA")
+    a = np.asarray(img)
+    if a[..., 3].min() < 255:
+        m = Image.fromarray(a[..., 3])
+    else:
+        m = Image.fromarray(((a[..., :3].astype(np.int32).sum(-1) > 30) * 255).astype(np.uint8))
+    if m.size != (width, height):
+        m = m.resize((width, height), Image.BILINEAR)
+    return np.asarray(m, dtype=np.float32) / 255.0

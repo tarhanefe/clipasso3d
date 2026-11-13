@@ -9,6 +9,12 @@ recorded in <out>/manifest.json together with the attribution that CC-BY require
     pip install objaverse
     python tools/fetch_objaverse.py --out meshes/objaverse
     python tools/fetch_objaverse.py --out meshes/objaverse --swap car_(automobile)   # take the next backup
+
+The curated set used in the project (picks checked by eye, bad ones swapped) is committed as
+meshes/objaverse_selection.json (ids and attribution only, no mesh data). Download exactly it:
+    python tools/fetch_objaverse.py --out meshes/objaverse --selection meshes/objaverse_selection.json
+Save the current picks as a new selection:
+    python tools/fetch_objaverse.py --out meshes/objaverse --write_selection meshes/objaverse_selection.json
 """
 import argparse
 import json
@@ -64,10 +70,16 @@ def main():
     p.add_argument("--max_faces", type=int, default=60000)
     p.add_argument("--backups", type=int, default=3, help="Backup candidates kept per category")
     p.add_argument("--swap", nargs="*", default=[], help="Categories whose current pick is replaced by the next backup")
+    p.add_argument("--selection", help="Download exactly the objects of this selection file")
+    p.add_argument("--write_selection", help="Write the current picks to this selection file")
     args = p.parse_args()
     os.makedirs(args.out, exist_ok=True)
     man_path = os.path.join(args.out, "manifest.json")
     manifest = json.load(open(man_path)) if os.path.exists(man_path) else {}
+
+    if args.selection:
+        download_selection(json.load(open(args.selection)), args.out, manifest, man_path)
+        return
 
     lvis = objaverse.load_lvis_annotations()
     todo = [c for c in args.categories if c not in manifest or c in args.swap]
@@ -97,11 +109,30 @@ def main():
             shutil.copy(paths[m["uid"]], dst)
         print(f"[fetch] {c:28s} {m['faces']:>6} faces  {m['license']:4s}  {m['name']}  ({m['author']})")
 
-    tmp = man_path + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(manifest, f, indent=2)
-    os.replace(tmp, man_path)
+    write_json(man_path, manifest)
+    if args.write_selection:
+        write_json(args.write_selection, sorted(picks.values(), key=lambda m: m["category"]))
+        print(f"[fetch] selection -> {args.write_selection}")
     print(f"[fetch] {len(picks)} objects in {args.out}")
+
+
+def download_selection(selection, out, manifest, man_path):
+    paths = objaverse.load_objects(uids=[m["uid"] for m in selection])
+    for m in selection:
+        dst = os.path.join(out, f"{m['category']}.glb")
+        if not os.path.exists(dst) or manifest.get(m["category"], {}).get("pick", {}).get("uid") != m["uid"]:
+            shutil.copy(paths[m["uid"]], dst)
+        manifest.setdefault(m["category"], {"backups": [], "rejected": []})["pick"] = m
+        print(f"[fetch] {m['category']:28s} {m['faces']:>6} faces  {m['license']:4s}  {m['name']}  ({m['author']})")
+    write_json(man_path, manifest)
+    print(f"[fetch] {len(selection)} objects in {out}")
+
+
+def write_json(path, obj):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(obj, f, indent=2)
+    os.replace(tmp, path)
 
 
 if __name__ == "__main__":

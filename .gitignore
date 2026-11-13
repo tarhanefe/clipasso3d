@@ -186,5 +186,11 @@ training_frames
 # Meshes and rendered datasets (large; licenses need attribution, see meshes/README.md)
 /meshes/*
 !/meshes/README.md
+!/meshes/objaverse_selection.json
 /data/objaverse/
 .DS_Store
+
+# Training runs and job lists (tools/sweep.py)
+/runs/
+/jobs/
+wandb/

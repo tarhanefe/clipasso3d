@@ -101,16 +101,16 @@ class CLIPLoss(torch.nn.Module):
             transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)))
         self.augment_trans = transforms.Compose(augemntations)
 
-        self.calc_target = True
         self.include_target_in_aug = args.include_target_in_aug
         self.counter = 0
         self.augment_both = args.augment_both
 
     def forward(self, sketches, targets, mode="train"):
-        if self.calc_target:
+        # Target features are recomputed every call: in the multi-view setting each step
+        # compares against a different view (2D CLIPasso cached them for its single target).
+        with torch.no_grad():
             targets_ = self.preprocess(targets).to(self.device)
             self.targets_features = self.model.encode_image(targets_).detach()
-            self.calc_target = False
 
         if mode == "eval":
             # for regular clip distance, no augmentations
