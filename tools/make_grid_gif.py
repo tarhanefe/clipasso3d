@@ -37,7 +37,6 @@ def intrinsics(fov, res):
     return torch.tensor([[f, 0, res / 2], [0, f, res / 2], [0, 0, 1]], dtype=torch.float32)
 
 
-@torch.no_grad()
 def zoom_crop(img, zoom):
     """Central 1/zoom of the image (same crop for sketches and ground truth)."""
     if zoom <= 1:
@@ -47,6 +46,7 @@ def zoom_crop(img, zoom):
     return img.crop(((w - cw) / 2, (h - ch) / 2, (w + cw) / 2, (h + ch) / 2))
 
 
+@torch.no_grad()
 def render_orbit(run_dir, c2ws, K, res, cell, zoom=1.0):
     """Sketch of one run from every turntable camera, black on white, as (frames, cell, cell) uint8."""
     cfg = json.load(open(os.path.join(run_dir, "config.json")))
