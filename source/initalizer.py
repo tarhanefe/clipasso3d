@@ -3,7 +3,7 @@ import random
 import os 
 from PIL import Image
 import torchvision.transforms as T
-from source.utils import load_scene
+from source.utils import load_scene, load_rgb
 
 # --- Initialize curves as short lines at random locations on a sphere ---
 def random_short_lines(center: torch.Tensor,
@@ -89,12 +89,11 @@ def initialize_saliency_curves(
         for ext in (".png", ".jpg", ".jpeg"):
             cand = os.path.join(image_dir, rel, stem + ext)
             if os.path.exists(cand):
-                img = Image.open(cand).convert("RGB")
+                img = load_rgb(cand, width, height)
                 break
         else:
             raise FileNotFoundError(f"No image for {stem}")
         t = to_tensor(img).unsqueeze(0).to(device)
-        t = torch.nn.functional.interpolate(t, size=(height, width), mode="bilinear")
         images.append(t)
 
     # 3. Compute saliency maps & pick 2D seeds

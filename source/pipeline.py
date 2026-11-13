@@ -60,7 +60,11 @@ def run_pipeline(args):
 
     torch.save({'means': means, 'thicknesses': thicknesses, 'scene_center': trainer.train_sampler.scene_center, 'K': trainer.train_sampler.K}, 'tensors.pt')
 
-    render_semihelical_gif(means, args.thickness, torch.tensor(trainer.train_sampler.scene_center), 15,
+    # orbit at the mean training-camera distance, so normalized (Objaverse) and old scenes both fit
+    cam_pos = trainer.train_sampler.c2w_all[:, :3, 3].cpu()
+    scene_center = torch.tensor(trainer.train_sampler.scene_center, dtype=cam_pos.dtype)
+    orbit_radius = (cam_pos - scene_center).norm(dim=1).mean().item()
+    render_semihelical_gif(means, args.thickness, scene_center, orbit_radius,
                            trainer.train_sampler.K, args.width, args.height,
                            args.gif_fps, args.rotation_time, args.revolutions,
                            output_path=args.output_semigif)

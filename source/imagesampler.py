@@ -173,7 +173,7 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 sys.path.append("..")
-from source.utils import load_scene
+from source.utils import load_scene, load_rgb
 
 
 class ImageSampler:
@@ -218,13 +218,12 @@ class ImageSampler:
             for ext in [".png", ".jpg", ".jpeg"]:
                 candidate = os.path.join(base_dir, stem + ext)
                 if os.path.exists(candidate):
-                    img = Image.open(candidate).convert("RGB")
+                    img = load_rgb(candidate, width, height)
                     break
             else:
                 raise FileNotFoundError(f"Missing image for {stem} in {base_dir}")
 
             t = to_tensor(img).unsqueeze(0).to(device)
-            t = torch.nn.functional.interpolate(t, size=(height, width), mode="bilinear")
             self.images.append(t)
 
     def sample(self, idx: int):

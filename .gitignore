@@ -183,3 +183,8 @@ cython_debug/
 training_frames
 .vscode/
 *.pkl
+# Meshes and rendered datasets (large; licenses need attribution, see meshes/README.md)
+/meshes/*
+!/meshes/README.md
+/data/objaverse/
+.DS_Store

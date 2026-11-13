@@ -53,3 +53,17 @@ def load_scene(
     c2w_mats = torch.stack(c2w_mats, dim=0)
 
     return file_paths, c2w_mats, K
+
+def load_rgb(path: str, width: int, height: int, background=(0, 0, 0)):
+    """
+    Load an image as RGB at (width, height). Transparent pixels (meshes rendered with
+    tools/render_mesh.py) are composited over `background`; opaque images are unchanged.
+    """
+    from PIL import Image
+
+    img = Image.open(path).convert("RGBA")
+    bg = Image.new("RGBA", img.size, tuple(background) + (255,))
+    img = Image.alpha_composite(bg, img).convert("RGB")
+    if img.size != (width, height):
+        img = img.resize((width, height), Image.LANCZOS)
+    return img

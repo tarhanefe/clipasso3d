@@ -108,6 +108,12 @@ where
 
 ---
 
+## 3- Train on your own meshes or Objaverse objects
+
+Any `.glb` / `.obj` / `.fbx` / `.ply` / `.stl` mesh can be rendered into a training scene with Blender
+(`tools/render_mesh.py`), and `tools/fetch_objaverse.py` downloads a set of simple CC-BY objects.
+See [meshes/README.md](meshes/README.md) for where to put the files and how to render, check and train.
+
 ## Examples
 
 #### The plant 
