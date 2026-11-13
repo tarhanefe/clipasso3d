@@ -42,6 +42,9 @@ def make_jobs(args, extra):
         jobs.append({"run_dir": run_dir,
                      "args": ["--data_root", args.data_root, "--data_name", rel, "--run_name", args.run_name] + extra})
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+    if args.append and os.path.exists(args.out):
+        done = {j["run_dir"] for j in load_jobs(args.out)}
+        jobs = load_jobs(args.out) + [j for j in jobs if j["run_dir"] not in done]
     with open(args.out + ".tmp", "w") as f:
         for j in jobs:
             f.write(json.dumps(j) + "\n")
@@ -178,6 +181,7 @@ def main():
     m.add_argument("--runs_root", default="runs")
     m.add_argument("--run_name", required=True)
     m.add_argument("--out", required=True)
+    m.add_argument("--append", action="store_true", help="Add to an existing job list (same run_dir is not duplicated)")
     r = sub.add_parser("run", help="Run a worker")
     r.add_argument("--jobs", required=True)
     r.add_argument("--worker", type=int, default=0)
