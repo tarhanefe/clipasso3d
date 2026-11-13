@@ -165,11 +165,18 @@ def run_worker(args):
                 with open(os.path.join(rd, "FAILED"), "w") as f:
                     f.write(out[-5000:])
             release(claim)
-        if not claimed_any:
+        if claimed_any:
+            continue
+        # nothing claimable right now: only stop when every job is finished. Jobs claimed by other
+        # workers may still become free (a preempted pod leaves claims behind that go stale after
+        # --stale seconds), so keep checking until then.
+        pending = [j["run_dir"] for j in jobs
+                   if not any(os.path.exists(os.path.join(j["run_dir"], m)) for m in ("DONE", "FAILED"))]
+        if not pending:
             break
-    pending = [j["run_dir"] for j in jobs
-               if not any(os.path.exists(os.path.join(j["run_dir"], m)) for m in ("DONE", "FAILED"))]
-    print(f"[{me}] nothing left to claim ({len(pending)} jobs still running on other workers)", flush=True)
+        print(f"[{me}] {len(pending)} jobs claimed by other workers, checking again in {args.poll:.0f} s", flush=True)
+        time.sleep(args.poll)
+    print(f"[{me}] all jobs finished", flush=True)
 
 
 def main():
@@ -188,6 +195,7 @@ def main():
     r.add_argument("--nworkers", type=int, default=1)
     r.add_argument("--stale", type=float, default=600, help="Seconds without heartbeat before a claim is dead")
     r.add_argument("--max_failures", type=int, default=3)
+    r.add_argument("--poll", type=float, default=60, help="Seconds between checks while other workers hold all jobs")
 
     argv = sys.argv[1:]
     extra = []
