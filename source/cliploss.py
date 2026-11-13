@@ -94,7 +94,7 @@ class CLIPLoss(torch.nn.Module):
         augemntations = []
         if "affine" in args.augemntations:
             augemntations.append(transforms.RandomPerspective(
-                fill=0, p=1.0, distortion_scale=0.5))
+                fill=getattr(args, "aug_fill", 0), p=1.0, distortion_scale=0.5))
             augemntations.append(transforms.RandomResizedCrop(
                 224, scale=(0.8, 0.8), ratio=(1.0, 1.0)))
         augemntations.append(
@@ -388,7 +388,7 @@ class CLIPConvLoss(torch.nn.Module):
         augemntations = []
         if "affine" in args.augemntations:
             augemntations.append(transforms.RandomPerspective(
-                fill=0, p=1.0, distortion_scale=0.5))
+                fill=getattr(args, "aug_fill", 0), p=1.0, distortion_scale=0.5))
             augemntations.append(transforms.RandomResizedCrop(
                 224, scale=(0.8, 0.8), ratio=(1.0, 1.0)))
         augemntations.append(

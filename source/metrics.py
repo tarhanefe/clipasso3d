@@ -8,13 +8,13 @@ CLIP_STD = (0.26862954, 0.26130258, 0.27577711)
 
 @torch.no_grad()
 def render_views(curve_set, rasterizer, sampler, width, height):
-    """Render every view of `sampler`; returns (V,3,H,W) sketches in [0,1]."""
+    """Render every view of `sampler`; returns (V,1,H,W) stroke coverage in [0,1]."""
     means, thicknesses = curve_set()
     out = []
     for idx in range(len(sampler)):
         _, K, w2c = sampler.sample(idx)
         a = rasterizer(means, thicknesses, w2c, K, width, height)
-        out.append(a.permute(2, 0, 1).repeat(3, 1, 1))
+        out.append(a.permute(2, 0, 1))
     return torch.stack(out)
 
 
@@ -36,9 +36,9 @@ def clip_similarity(clip_model, sketches, targets, batch=32):
 
 
 @torch.no_grad()
-def silhouette_precision(sketches, masks):
-    """Fraction of stroke ink that falls on the object, per view. masks: (V,1,H,W) in [0,1]."""
-    ink = sketches[:, :1]
+def silhouette_precision(coverage, masks):
+    """Fraction of stroke ink that falls on the object, per view. coverage, masks: (V,1,H,W) in [0,1]."""
+    ink = coverage
     return (ink * masks).flatten(1).sum(1) / ink.flatten(1).sum(1).clamp_min(1e-8)
 
 
@@ -68,13 +68,22 @@ def chamfer_to_surface(curve_points, surface_points, max_surface=20000, chunk=40
 
 
 @torch.no_grad()
-def evaluate_views(curve_set, rasterizer, sampler, clip_model, width, height):
-    """CLIP similarity and silhouette precision on all views of `sampler` (mean over views)."""
-    sketches = render_views(curve_set, rasterizer, sampler, width, height)
-    targets = torch.cat(sampler.images)
+def evaluate_views(curve_set, rasterizer, sampler, clip_model, width, height, invert=False):
+    """
+    CLIP similarity and silhouette precision on all views of `sampler` (mean over views).
+
+    The protocol is the same whatever the training style, so runs are comparable: the sketch
+    is drawn black on white and compared with the target composited on white. `invert` says
+    whether the sampler's targets are already on white (black_on_white training) or on black.
+    """
+    coverage = render_views(curve_set, rasterizer, sampler, width, height)
+    sketches = 1 - coverage.repeat(1, 3, 1, 1)
     masks = torch.cat(sampler.masks)
+    targets = torch.cat(sampler.images)
+    if not invert:      # on black: c*a  ->  on white: c*a + (1 - a)
+        targets = (targets + (1 - masks)).clamp(0, 1)
     sim = clip_similarity(clip_model, sketches, targets)
-    prec = silhouette_precision(sketches, masks)
+    prec = silhouette_precision(coverage, masks)
     return {
         "clip_similarity": sim.mean().item(),
         "silhouette_precision": prec.mean().item(),

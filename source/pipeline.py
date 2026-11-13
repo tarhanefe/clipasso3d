@@ -13,7 +13,7 @@ from source.cliploss import Loss
 from source.beziercurve import CurveSet
 from source.diffrasterizer import rasterize_spheres
 from source.imagesampler import ImageSampler
-from source.initalizer import random_short_lines
+from source.initalizer import random_short_lines, hull_short_lines
 from source.metrics import evaluate_views, chamfer_to_surface
 from source.trainer import Trainer
 
@@ -79,10 +79,13 @@ def run_pipeline(args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     write_json(out_dir / "config.json", {**vars(args), "git_commit": git_commit(), "device": device})
 
+    # black_on_white: strokes are drawn dark on white and the targets are composited on white
+    invert = args.style == 'black_on_white'
+    bg = (255, 255, 255) if invert else (0, 0, 0)
     base = Path(args.data_root) / args.data_name
-    train_sampler = ImageSampler(str(base / 'transforms_train.json'), str(base / 'rgb'), args.width, args.height, device)
-    val_sampler   = ImageSampler(str(base / 'transforms_val.json'), str(base / 'rgb'), args.width, args.height, device)
-    test_sampler  = ImageSampler(str(base / 'transforms_test.json'), str(base / 'rgb'), args.width, args.height, device)
+    train_sampler = ImageSampler(str(base / 'transforms_train.json'), str(base / 'rgb'), args.width, args.height, device, bg)
+    val_sampler   = ImageSampler(str(base / 'transforms_val.json'), str(base / 'rgb'), args.width, args.height, device, bg)
+    test_sampler  = ImageSampler(str(base / 'transforms_test.json'), str(base / 'rgb'), args.width, args.height, device, bg)
     for s in (train_sampler, val_sampler, test_sampler):
         limit_views(s, args.limit_views)
 
@@ -101,14 +104,19 @@ def run_pipeline(args):
         augment_both=False,
         clip_model_name='ViT-B/32',
         clip_conv_loss_type='L2',
-        clip_conv_layer_weights=args.clip_conv_layer_weights
+        clip_conv_layer_weights=args.clip_conv_layer_weights,
+        aug_fill=1.0 if invert else 0.0,
     )).to(device)
 
     rasterizer = rasterize_spheres if args.no_compile else torch.compile(rasterize_spheres)
     center_t = torch.tensor(train_sampler.scene_center, device=device, dtype=torch.float32)
-    curves = random_short_lines(center_t, args.n_curves, args.radius, args.length, device)
+    if args.init == 'hull':
+        curves = hull_short_lines(train_sampler, args.n_curves, args.length, args.hull_grid, device)
+    else:
+        curves = random_short_lines(center_t, args.n_curves, args.radius, args.length, device)
 
-    curve_set = CurveSet(curves, args.thickness, args.overlap, arc_samples=300, device=device).to(device)
+    curve_set = CurveSet(curves, args.thickness, args.overlap, arc_samples=300, device=device,
+                         samples_per_curve=args.samples_per_curve).to(device)
     optimizer = torch.optim.Adam(curve_set.parameters(), lr=args.learning_rate)
 
     wandb_run = init_wandb(args, out_dir) if args.wandb else None
@@ -119,7 +127,7 @@ def run_pipeline(args):
                       device=device, display_plots=False,
                       ckpt_path=str(out_dir / "ckpt.pt"), ckpt_every=args.ckpt_every,
                       frame_every=args.frame_every, log_path=str(out_dir / "log.jsonl"),
-                      wandb_run=wandb_run)
+                      wandb_run=wandb_run, invert=invert)
 
     means, thicknesses = trainer.train()
 
@@ -134,7 +142,7 @@ def run_pipeline(args):
     # -- metrics on the held-out test views (and on the true surface when the dataset has it) --
     clip_model = criterion.loss_mapper["clip"].model
     metrics = {"test_loss": trainer.test_loss,
-               **evaluate_views(curve_set, rasterizer, test_sampler, clip_model, args.width, args.height)}
+               **evaluate_views(curve_set, rasterizer, test_sampler, clip_model, args.width, args.height, invert)}
     surface = base / "surface_points.npy"
     if surface.exists():
         metrics.update(chamfer_to_surface(means, torch.from_numpy(np.load(surface))))
@@ -150,7 +158,7 @@ def run_pipeline(args):
     render_semihelical_gif(means, args.thickness, scene_center, orbit_radius,
                            trainer.train_sampler.K, args.width, args.height,
                            args.gif_fps, args.rotation_time, args.revolutions,
-                           output_path=str(semigif))
+                           output_path=str(semigif), invert=invert)
 
     train_gif = out_dir / args.output_gif
     frame_paths = sorted(frames_dir.glob("batch_*.png"))
@@ -186,7 +194,7 @@ def look_at(eye, center, up):
     return view
 
 
-def render_semihelical_gif(means, radii, scene_center, scene_radius, K, width, height, fps, rotation_time, revolutions, up=torch.tensor([0., 0, 1]), output_path="semihelical.gif"):
+def render_semihelical_gif(means, radii, scene_center, scene_radius, K, width, height, fps, rotation_time, revolutions, up=torch.tensor([0., 0, 1]), output_path="semihelical.gif", invert=False):
     device = means.device
     center = scene_center.to(device=device, dtype=means.dtype)
     up_vec = up.to(device=device, dtype=means.dtype)
@@ -205,7 +213,8 @@ def render_semihelical_gif(means, radii, scene_center, scene_radius, K, width, h
         V = look_at(cam_pos, center, up_vec)
         with torch.no_grad():
             alpha = rasterize_spheres(means, radii, V, K, width, height)
-        a_np = (alpha[..., 0].detach().cpu().numpy() * 255).astype(np.uint8)
+        a = alpha[..., 0].detach().cpu().numpy()
+        a_np = ((1 - a if invert else a) * 255).astype(np.uint8)
         rgb = np.stack([a_np] * 3, axis=-1)
         frames.append(PILImage.fromarray(rgb))
     frames[0].save(output_path, save_all=True, append_images=frames[1:], duration=duration_ms, loop=0)

@@ -89,15 +89,50 @@ class BezierCurve(nn.Module):
     
 
 class CurveSet(nn.Module):
-    def __init__(self, init_pts_list, thickness=0.02, overlap=0.8, arc_samples=300, device='cuda'):
+    """
+    A set of Bézier curves rendered as chains of spheres.
+
+    samples_per_curve = 0: each curve picks its own number of spheres from its length,
+        thickness and overlap (original behaviour; the total changes every step).
+    samples_per_curve = S > 0: every curve gets exactly S spheres spaced uniformly in arc
+        length, computed for all curves at once (fixed shape, much faster with torch.compile).
+    """
+    def __init__(self, init_pts_list, thickness=0.02, overlap=0.8, arc_samples=300, device='cuda',
+                 samples_per_curve: int = 0):
         super().__init__()
         self.curves = nn.ModuleList([
             BezierCurve(pts.to(device), thickness, overlap, arc_samples, device=device)
             for pts in init_pts_list
         ])
         self.device = device
+        self.thickness = float(thickness)
+        self.samples_per_curve = int(samples_per_curve)
+
+    def _forward_fixed(self):
+        P = torch.stack([c.P for c in self.curves])                    # (C,N,3)
+        ref = self.curves[0]
+        S, C = self.samples_per_curve, P.size(0)
+        # dense points to approximate arc length, all curves at once
+        t = ref.t_dense.unsqueeze(1)                                   # (D,1)
+        coefs = ref.binoms * t ** ref.idxs * (1 - t) ** (ref.deg - ref.idxs)   # (D,N)
+        pts = torch.einsum('dn,cnk->cdk', coefs, P)                    # (C,D,3)
+        seg = (pts[:, 1:] - pts[:, :-1]).norm(dim=-1)                  # (C,D-1)
+        cumlen = torch.cat([seg.new_zeros(C, 1), seg.cumsum(1)], 1)    # (C,D)
+        # invert arc length: S targets uniformly spaced along each curve
+        s_des = torch.linspace(0, 1, S, device=P.device).unsqueeze(0) * cumlen[:, -1:]   # (C,S)
+        idx = torch.searchsorted(cumlen.detach().contiguous(), s_des.detach().contiguous())
+        idx = idx.clamp(1, cumlen.size(1) - 1)
+        c0, c1 = cumlen.gather(1, idx - 1), cumlen.gather(1, idx)
+        t0, t1 = ref.t_dense[idx - 1], ref.t_dense[idx]
+        t_samp = (t0 + (t1 - t0) * ((s_des - c0) / (c1 - c0).clamp_min(1e-12))).unsqueeze(-1)  # (C,S,1)
+        coefs = ref.binoms * t_samp ** ref.idxs * (1 - t_samp) ** (ref.deg - ref.idxs)          # (C,S,N)
+        means = torch.einsum('csn,cnk->csk', coefs, P).reshape(-1, 3)  # (C*S,3)
+        thicknesses = means.new_full((means.size(0),), self.thickness)
+        return means, thicknesses
 
     def forward(self):
+        if self.samples_per_curve > 0:
+            return self._forward_fixed()
         means_list, th_list = [], []
         for curve in self.curves:
             m, t = curve()   # (M_i, 3), (M_i,)

@@ -184,6 +184,7 @@ class ImageSampler:
         width: int,
         height: int,
         device: str = "cuda",
+        background=(0, 0, 0),
     ):
         # Load scene definitions (paths, c2w, intrinsics)
         file_paths, c2w_all, K = load_scene(transforms_json, width, height, device)
@@ -219,7 +220,7 @@ class ImageSampler:
             for ext in [".png", ".jpg", ".jpeg"]:
                 candidate = os.path.join(base_dir, stem + ext)
                 if os.path.exists(candidate):
-                    img = load_rgb(candidate, width, height)
+                    img = load_rgb(candidate, width, height, background)
                     break
             else:
                 raise FileNotFoundError(f"Missing image for {stem} in {base_dir}")

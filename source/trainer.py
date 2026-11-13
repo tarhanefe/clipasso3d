@@ -44,6 +44,7 @@ class Trainer:
         frame_every: int = 1,
         log_path: str = None,
         wandb_run=None,
+        invert: bool = False,
     ):
         self.train_sampler = train_sampler
         self.val_sampler = val_sampler
@@ -68,6 +69,7 @@ class Trainer:
         self.frame_every = frame_every
         self.log_path = log_path
         self.wandb_run = wandb_run
+        self.invert = invert    # True: black strokes on white (targets must be on white too)
 
         # training schedule
         self.N_train = len(train_sampler)
@@ -138,6 +140,11 @@ class Trainer:
         entry["time"] = time.time()
         with open(self.log_path, "a") as f:
             f.write(json.dumps(entry) + "\n")
+
+    def to_image(self, alpha):
+        """(H,W,1) stroke coverage -> (1,3,H,W) sketch image."""
+        img = alpha.permute(2, 0, 1).unsqueeze(0).repeat(1, 3, 1, 1)
+        return 1 - img if self.invert else img
 
     # ------------------------------------------------------------ display / frames
 
@@ -229,7 +236,7 @@ class Trainer:
                         self.means, self.thicknesses, w2c, K,
                         self.width, self.height
                     )
-                    render = render.permute(2, 0, 1).unsqueeze(0).repeat(1, 3, 1, 1)
+                    render = self.to_image(render)
                     it = batch_idx * self.inner_steps
                     losses.append(self.criterion(render, rgb, it))
                 train_loss_tensor = torch.stack(losses).mean()
@@ -279,7 +286,7 @@ class Trainer:
             for idx in range(count):
                 rgb, K, w2c = sampler.sample(idx)
                 render = self.rasterizer(means, thicknesses, w2c, K, self.width, self.height)
-                render = render.permute(2, 0, 1).unsqueeze(0).repeat(1, 3, 1, 1)
+                render = self.to_image(render)
                 loss = self.criterion(render, rgb, -1, mode="eval")
                 total_loss += loss.item()
         self.curve_set.train()

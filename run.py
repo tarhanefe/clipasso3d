@@ -35,6 +35,13 @@ def parse_args():
     parser.add_argument('--radius', type=float, default=0.8)
     parser.add_argument('--length', type=float, default=0.02)
     parser.add_argument('--overlap', type=float, default=0.6)
+    parser.add_argument('--samples_per_curve', type=int, default=0,
+                        help='Spheres per curve (0 = derived from length/thickness/overlap, the original behaviour)')
+    parser.add_argument('--init', type=str, default='sphere', choices=['sphere', 'hull'],
+                        help='sphere: random short lines on a sphere of --radius; hull: spread over the visual hull surface')
+    parser.add_argument('--hull_grid', type=int, default=64, help='Voxel grid resolution of the visual hull')
+    parser.add_argument('--style', type=str, default='white_on_black', choices=['white_on_black', 'black_on_white'],
+                        help='Stroke/background colors (targets are composited on the same background)')
 
     # CLIP-related weights
     parser.add_argument('--clip_weight', type=float, default=1.0)
