@@ -13,7 +13,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OBJECTS=("$@"); [ ${#OBJECTS[@]} -gt 0 ] || OBJECTS=("car_(automobile)" airplane chair teapot bicycle guitar)
-WANDB=(--wandb --wandb_entity efe-tarhan-epfl --wandb_project clipasso3d)
+# offline on the training pods; the CPU pod live-syncs runs/ to wandb (pod scripts: wandb_sync.sh)
+WANDB=(--wandb --wandb_mode offline --wandb_entity efe-tarhan-epfl --wandb_project clipasso3d)
 COMMON=(--n_curves 25 --thickness 0.02 --gif_fps 30 --rotation_time 6 "${WANDB[@]}")
 CLIPASSO=(--clip_weight 0 --clip_conv_loss 1 --clip_fc_loss_weight 0.1 --clip_conv_layer_weights 0 0 1 1 0)
 OLD=(--epochs 10 --batch_size 1 --inner_steps 30 --frame_every 5)
@@ -34,7 +35,7 @@ declare -A CFG=(
 NAMES=(B_clipasso C_fixed D_bw E_hull F_mv G_all A_repo)   # CLIPasso-loss runs first
 mkdir -p jobs/round1
 for obj in "${OBJECTS[@]}"; do
-  out="jobs/round1/${obj}.jsonl"; rm -f "$out"
+  out="jobs/round1/${obj//[()]/}.jsonl"; rm -f "$out"   # no parentheses in file names (shell-safe pod commands)
   for name in "${NAMES[@]}"; do
     # shellcheck disable=SC2086
     python tools/sweep.py make --datasets "data/objaverse/$obj" --run_name "round1_$name" \
