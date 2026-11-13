@@ -23,6 +23,9 @@ from source.diffrasterizer import rasterize_spheres_sparse  # noqa: E402
 from tools.overlay import load_curves  # noqa: E402
 
 LEVELS = ["too_geometric", "middle_geometric", "normal", "middle_abstract", "too_abstract"]
+LEVEL_LABELS = {"too_geometric": "geometric only, λ=0", "middle_geometric": "geometry-weighted, λ=0.02",
+                "normal": "CLIPasso default, λ=0.1", "middle_abstract": "equal weights, λ=1",
+                "too_abstract": "semantics-weighted, λ=10"}
 LINES = [5, 10, 20, 50, 100, 200]
 
 
@@ -80,7 +83,7 @@ def main():
     p.add_argument("--row_labels", nargs="*", default=None, help="Display names of --levels (same order)")
     p.add_argument("--out", required=True)
     args = p.parse_args()
-    row_label = dict(zip(args.levels, args.row_labels or [lv.replace("_", " ") for lv in args.levels]))
+    row_label = dict(zip(args.levels, args.row_labels or [LEVEL_LABELS.get(lv, lv.replace("_", " ")) for lv in args.levels]))
 
     cams = json.load(open(os.path.join(args.turntable, "cameras.json")))
     c2ws = [torch.tensor(c, dtype=torch.float32) for c in cams["c2w"]]

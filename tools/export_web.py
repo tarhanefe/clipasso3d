@@ -24,8 +24,18 @@ import os
 
 import numpy as np
 
-LEVEL_LABELS = {"too_geometric": "too geometric", "middle_geometric": "middle geometric", "normal": "normal",
-                "middle_abstract": "middle abstract", "too_abstract": "too abstract"}
+# abstraction levels, named by their loss weighting; sub = lambda = w_semantic / w_geometric
+LEVEL_LABELS = {"too_geometric": "geometric only", "middle_geometric": "geometry-weighted", "normal": "CLIPasso default",
+                "middle_abstract": "equal weights", "too_abstract": "semantics-weighted"}
+LEVEL_LAMBDA = {"too_geometric": "0", "middle_geometric": "0.02", "normal": "0.1", "middle_abstract": "1",
+                "too_abstract": "10"}
+
+
+def level(key):
+    e = {"key": key, "label": LEVEL_LABELS.get(key, label(key))}
+    if key in LEVEL_LAMBDA:
+        e["sub"] = f"λ = {LEVEL_LAMBDA[key]}"
+    return e
 
 
 def label(key):
@@ -87,7 +97,7 @@ def export_index(args):
                      if os.path.exists(os.path.join(p, "transforms_test.json")))
     index = {
         "objects": [],
-        "levels": [{"key": k, "label": LEVEL_LABELS.get(k, label(k))} for k in args.rows],
+        "levels": [level(k) for k in args.rows],
         "lines": [{"key": str(c), "label": f"{c} lines"} for c in args.cols],
     }
     for o in objects:
@@ -112,7 +122,7 @@ def export_index(args):
 def export_metrics(args):
     names = [("clip_similarity", "CLIP similarity", True), ("silhouette_precision", "ink on the object", True),
              ("chamfer", "Chamfer distance", False)]
-    out = {"rows": [{"key": r, "label": LEVEL_LABELS.get(r, label(r))} for r in args.rows],
+    out = {"rows": [level(r) for r in args.rows],
            "cols": [{"key": str(c), "label": str(c)} for c in args.cols], "metrics": []}
     cells = {}
     for row in args.rows:
