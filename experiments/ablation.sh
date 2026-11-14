@@ -10,9 +10,9 @@
 # Each run stops when the validation loss (every 100 batches) has not improved by 0.5% for 5
 # validations, after at least 500 and at most 7800 batches (600 epochs).
 #
-# Abstraction = balance of CLIPasso's two losses (no extra semantic CLIPLoss, --clip_weight 0):
-#   geometric: L2 between CLIP ViT layers 2,3 of sketch and target (per-layer weights)
-#   semantic:  cosine distance of the final CLIP embeddings (--clip_fc_loss_weight)
+# Abstraction = balance of CLIPasso's two losses:
+#   geometric: L2 between CLIP ViT layers 2,3 of sketch and target (--geometric_weight)
+#   semantic:  cosine distance of the final CLIP embeddings (--semantic_weight)
 #                       geometric  semantic  semantic/geometric
 #   too_geometric          1.0       0          0
 #   middle_geometric       1.0       0.02       0.02
@@ -29,17 +29,17 @@ if [ ${#OBJECTS[@]} -eq 0 ]; then
 fi
 WANDB=(--wandb --wandb_mode offline --wandb_entity efe-tarhan-epfl --wandb_project clipasso3d)
 STOP=(--epochs 600 --eval_interval 100 --early_stop_patience 5 --early_stop_tol 0.005 --min_batches 500)
-PRUNE=(--prune_mode respawn --prune_start 490 --prune_every 195 --prune_stop 2450)
+PRUNE=(--prune_start 490 --prune_every 195 --prune_stop 2450)
 COMMON=(--thickness 0.008 --snapshot_every 20 --frame_every 10 --gif_fps 30 --rotation_time 6
         "${STOP[@]}" "${PRUNE[@]}" "${WANDB[@]}")
 LINES=(5 10 20 50 100 200)
 LEVELS=(too_geometric middle_geometric normal middle_abstract too_abstract)
 declare -A ABS=(
-  [too_geometric]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 0"
-  [middle_geometric]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 0.02"
-  [normal]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 0.1"
-  [middle_abstract]="--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 1.0"
-  [too_abstract]="--clip_conv_layer_weights 0 0 0.1 0.1 0 --clip_fc_loss_weight 1.0"
+  [too_geometric]="--geometric_weight 1 --semantic_weight 0"
+  [middle_geometric]="--geometric_weight 1 --semantic_weight 0.02"
+  [normal]="--geometric_weight 1 --semantic_weight 0.1"
+  [middle_abstract]="--geometric_weight 1 --semantic_weight 1"
+  [too_abstract]="--geometric_weight 0.1 --semantic_weight 1"
 )
 mkdir -p jobs/ablation
 out=jobs/ablation/all.jsonl; rm -f "$out"

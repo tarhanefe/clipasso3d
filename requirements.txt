@@ -1,16 +1,8 @@
-ftfy
-jupyter
-matplotlib
+# PyTorch first, matching your CUDA version (see README), then: pip install -r requirements.txt
 numpy
 Pillow
-scipy
-scikit-image
-scikit-learn
-tqdm
-regex
-plotly
+git+https://github.com/openai/CLIP.git
 # optional: experiment tracking (run.py --wandb)
 wandb
-# optional: data tools (tools/check_poses.py, tools/fetch_objaverse.py)
-OpenEXR
+# optional: downloading the Objaverse objects (tools/fetch_objaverse.py)
 objaverse

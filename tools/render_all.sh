@@ -6,7 +6,6 @@
 #   tools/render_all.sh meshes/objaverse data/objaverse [extra render_mesh.py args]
 #
 # Blender: uses $BLENDER if set, else `blender` on PATH, else the macOS app bundle.
-# Progress: python tools/render_status.py data/objaverse
 set -uo pipefail
 MESH_DIR=${1:?mesh folder}
 OUT_DIR=${2:?output folder}

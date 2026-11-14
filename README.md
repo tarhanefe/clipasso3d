@@ -1,184 +1,93 @@
-# From Pixels to Wireframes: 3D Reconstruction via CLIP-Based Sketch Abstraction
+# From Pixels to Wireframes: 3D Sketches via CLIP-Based Abstraction
 
-<p align="center">
-  <img src="assets/pipeline.png" width=700px />
-</p>
+<p align="center"><img src="assets/boats.gif" width="100%" alt="An object and its 3D sketches with 5, 20, 50 and 200 lines"></p>
 
-This repository contains the complete implementation and supporting modules for the course project titled **“From Pixels to Wireframes: Reconstruction via CLIP-Based Sketch Abstraction”**, developed as part of the EPFL **CS503 — Visual Intelligence: Machines and Minds** course. The project explores a novel approach to abstracting 3D surfaces into wireframe-like representations by leveraging CLIP-based semantic guidance and Bézier curve parameterizations.
+A small set of 3D cubic Bézier curves is optimized so that, seen from any camera, it looks like the object
+to CLIP. Each curve is rendered as a chain of spherical Gaussians, so the renderings are differentiable with
+respect to the control points, and the loss is CLIPasso's balance of a geometric and a semantic CLIP term.
+The number of lines and that balance span everything from faithful wireframes to loose, abstract sketches.
 
----
+**Project page:** <https://tarhanefe.github.io/CLIPasso3DWebsite/> (interactive results on 20 Objaverse objects).
 
-# Project Structure
-
-```
-clipasso3d/
-├── CLIP_/                    
-├── data/
-├── notebooks/
-├── source/
-├── .gitignore
-├── .gitmodules
-├── README.md
-└── requirements.txt
-```
-
----
-
-# Setup & Installation
-
-**Clone the repository:**
-   ```bash
-   git clone --recurse-submodules https://github.com/tarhanefe/clipasso3d.git
-   cd clipasso3d
-   ```
-
-**Create a new Conda environment with python version 3.10:**
-   ```bash
-   conda create -n 3dsketch python=3.10 -y
-   conda activate 3dsketch
-   ```
-**Install Pytorch for Cuda version 12.1:**
-   ```bash
-   pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
-   ```
-
-**Install library requirements:**
-   ```bash
-   pip install -r requirements.txt
-   ```
----
-# How to Use ? 
-
-## 1- Trial Notebook
-
-Use ```WireframeTrial.ipynb```  notebook inside the notebooks folder to interactively examine the training process and obtained results.
-
-## 2- Run file 
+## Setup
 
 ```bash
-  cd clipasso3d
-  python run.py --data_name objaverse/teapot --run_name default
+git clone https://github.com/tarhanefe/clipasso3d.git && cd clipasso3d
+conda create -n clipasso3d python=3.10 -y && conda activate clipasso3d
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121   # match your CUDA
+pip install -r requirements.txt
 ```
-Defaults: black strokes on white, curves initialized on the visual hull, 25 curves of thickness 0.008,
-8 different views per step for 150 epochs, CLIPasso's loss balance (CLIP ViT layers 2,3 + 0.1 x
-semantic), all curves sampled at once with adaptive density. `python run.py --help` lists every option.
 
-<details><summary>The original settings of the course project</summary>
+Rendering training data needs [Blender](https://www.blender.org/download/) ≥ 3.6 (headless is fine).
+
+## 1. Data: mesh → multi-view images
 
 ```bash
-  python run.py --data_name rose --init sphere --length 0.02 --style white_on_black --sample_spacing 0 \
-  --rasterizer dense --batch_size 1 --epochs 10 --inner_steps 30 --n_curves 25 --thickness 0.02 \
-  --clip_weight 1.0 --clip_fc_loss_weight 0.1 --clip_conv_layer_weights 0 0 1.0 1.0 0.0
+# the project's 20 Objaverse objects (ids and attribution in meshes/objaverse_selection.json)
+python tools/fetch_objaverse.py --out meshes/objaverse --selection meshes/objaverse_selection.json
+# render every mesh: 100 train / 30 val / 30 test views, transparent background (resumable)
+tools/render_all.sh meshes/objaverse data/objaverse
 ```
-</details>
 
-where 
+Any `.glb/.gltf/.obj/.fbx/.ply/.stl` works; one mesh: `blender -b -P tools/render_mesh.py -- --mesh my.glb --out data/my`.
+Each scene is normalized to the unit sphere and written as `data/<name>/{transforms_*.json, rgb/, surface_points.npy}`
+(NeRF/Blender camera convention).
 
-### 🔧 Argument Descriptions
-
-| Argument                     | Description                                                                 |
-|-----------------------------|-----------------------------------------------------------------------------|
-| `--data_name`               | Dataset folder inside `--data_root` (default `data/`), e.g. `rose` or `objaverse/teapot`. |
-| `--run_name`                | Name of the configuration; outputs go to `runs/<data_name>/<run_name>/` (or `--out_dir`). |
-| `--seed`                    | Random seed (curve initialization, view sampling, augmentations).           |
-| `--output_gif`              | Training evolution GIF name inside the run folder.                          |
-| `--batch_size`              | Number of images processed per training batch.                              |
-| `--epochs`                  | Number of training epochs.                                                  |
-| `--inner_steps`             | Inner optimization steps per batch.                                         |
-| `--learning_rate`           | Learning rate for Adam optimizer.                                           |
-| `--n_curves`                | Number of Bézier curves initialized in the scene.                           |
-| `--thickness`               | Radius (thickness) of each rendered curve/sphere segment.                   |
-| `--radius`                  | Distance from the scene center to place initial curve points.               |
-| `--length`                  | Length of the each initial curve segment.                                   |
-| `--overlap`                 | Degree of allowed overlap between nearby spherical gaussians on a curve.    |
-| `--clip_weight`             | Total CLIP loss weight.                                                     |
-| `--clip_conv_loss`          | Weight of the convolutional CLIP loss.                                      |
-| `--clip_fc_loss_weight`     | Weight of CLIP’s final-layer (semantic) similarity loss.                    |
-| `--clip_conv_layer_weights` | Weights for each CLIP convolutional layer (ViT-B/32 has 5 layers).          |
-| `--gif_fps`                 | Frame rate (FPS) of generated GIFs.                                         |
-| `--rotation_time`           | Duration (in seconds) of 3D camera rotation in the fly-around GIF.          |
-| `--revolutions`             | Number of full revolutions in the semihelical fly-around.                   |
-| `--output_semigif`          | Output path for the 3D rendered semihelical GIF animation.                  |
-
----
-
-### Outputs, checkpoints and resuming
-
-Each run writes to its own folder `runs/<data_name>/<run_name>/`: `config.json` (arguments and git
-commit), `ckpt.pt` (saved every `--ckpt_every` batches), `log.jsonl` (one line per batch),
-`frames/`, `curves.pt`, `metrics.json`, the two GIFs and finally `DONE`. Running the same command
-again resumes from the checkpoint (bit-exact) or skips the run if it is finished.
-
-`metrics.json` is computed on the held-out test views: `clip_similarity` (CLIP ViT-B/32 cosine
-similarity between render and photo), `silhouette_precision` (fraction of stroke ink on the object)
-and, for rendered meshes, `accuracy` / `completeness` / `chamfer` (distances between the curves and
-the true surface, in units of the unit sphere).
-
-Optional Weights & Biases logging: `--wandb [--wandb_project clipasso3d] [--wandb_entity ...]`.
-A restarted run continues the same wandb run; `--wandb_mode offline` logs into the run folder for
-machines without internet (upload later with `wandb sync runs/.../wandb/offline-run-*`).
-
-### Many runs on many GPUs
+## 2. Train
 
 ```bash
-# one job per dataset; arguments after -- go to run.py
-python tools/sweep.py make --datasets data/objaverse/* --run_name baseline --out jobs/baseline.jsonl -- --epochs 10
-# start one worker per GPU (any number of pods); workers share jobs through the file system
-CUDA_VISIBLE_DEVICES=0 python tools/sweep.py run --jobs jobs/baseline.jsonl --worker 0 --nworkers 2
-CUDA_VISIBLE_DEVICES=1 python tools/sweep.py run --jobs jobs/baseline.jsonl --worker 1 --nworkers 2
-# progress: jobs done / total, running workers, failures, ETA, best results
-python tools/status.py jobs/baseline.jsonl
+python run.py --data_name objaverse/boat --n_curves 20
 ```
 
-Workers claim jobs atomically, refresh a heartbeat and take over jobs of workers that died; a job
-that keeps failing is marked `FAILED`, and CUDA errors make the worker exit so a fresh process retries.
+| Option | Default | |
+|---|---|---|
+| `--n_curves` | 25 | number of lines |
+| `--geometric_weight` / `--semantic_weight` | 1 / 0.1 | CLIPasso loss balance; a higher semantic share gives more abstract sketches |
+| `--thickness` | 0.008 | stroke radius (Gaussian σ, object fits the unit sphere) |
+| `--batch_size` / `--epochs` | 8 / 150 | views per step / passes over the training views |
+| `--early_stop_patience` | 0 (off) | stop once the validation loss is flat for this many validations |
+| `--prune_every`, `--prune_start`, `--prune_stop` | off, 0, 2450 | move lines that left the object back onto it (line count fixed) |
+| `--connect_weight`, `--weld` | 0, off | connectivity loss and final weld: one physically connected piece |
+| `--wandb` | off | log to Weights & Biases |
 
-## 3- Train on your own meshes or Objaverse objects
+Curves start as short lines spread over the visual hull of the training masks. `python run.py --help` lists
+every option. A run writes to `runs/<data_name>/<run_name>/`:
 
-Any `.glb` / `.obj` / `.fbx` / `.ply` / `.stl` mesh can be rendered into a training scene with Blender
-(`tools/render_mesh.py`), and `tools/fetch_objaverse.py` downloads a set of simple CC-BY objects.
-See [meshes/README.md](meshes/README.md) for where to put the files and how to render, check and train.
+- `curves.pt` (final control points) and `curves_history.npz` (snapshots during training)
+- `metrics.json` on the test views: CLIP similarity, ink on the object, Chamfer distance to the surface
+- `semihelical.gif` (fly-around) and `training_evolution.gif`
 
-## Examples
+Runs checkpoint as they go: the same command resumes a stopped run and skips a finished one.
 
-#### The plant 
+## 3. Experiments
 
+```bash
+experiments/ablation.sh        # 20 objects × {5,10,20,50,100,200} lines × 5 abstraction levels
+experiments/connectivity.sh    # no constraint / weld only / connectivity loss 0.1 and 1.0, at 5–200 lines
+# one worker per GPU, on any number of machines sharing the folder (restart-safe):
+CUDA_VISIBLE_DEVICES=0 python tools/sweep.py run --jobs jobs/ablation/all.jsonl --worker 0 --nworkers 4
+python tools/status.py jobs/ablation/all.jsonl     # done / total, running, failed, ETA
+```
 
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/tree.gif" width="250px"><br>Training of the Model</td>
-    <td align="center"><img src="assets/tree.png" width="250px"><br>Model w/ 3D Plant Model</td>
-    <td align="center"><img src="assets/tree_gt.png" width="250px"><br>Model w/ Ground Truth Plant</td>
-  </tr>
-</table>
+## 4. Figures and project page
 
+```bash
+blender -b -P tools/render_turntable.py -- --mesh meshes/objaverse/boat.glb --out turntables/boat
+python tools/make_grid_gif.py --object boat --turntable turntables/boat --out figures/boat_grid.gif   # lines × abstraction
+python tools/export_web.py runs --out ../CLIPasso3DWebsite/static/data                                 # interactive grids
+blender -b -P tools/export_gt_glb.py -- --mesh meshes/objaverse/boat.glb --out ../CLIPasso3DWebsite/static/data/gt/boat.glb
+```
 
-#### The rose 
+## Code
 
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/rose_5.gif" width="200px"><br>Model w/ 5 Curves</td>
-    <td align="center"><img src="assets/rose_10.gif" width="200px"><br>Model w/ 10 Curves</td>
-    <td align="center"><img src="assets/rose_15.gif" width="200px"><br>Model w/ 15 Curves</td>
-  </tr>
-</table>
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/rose_20.gif" width="200px"><br>Model w/ 20 Curves</td>
-    <td align="center"><img src="assets/rose_25.gif" width="200px"><br>Model w/ 25 Curves</td>
-    <td align="center"><img src="assets/rose_gt.gif" width="200px"><br>Ground Truth Scene</td>
-  </tr>
-</table>
+| | |
+|---|---|
+| `run.py`, `source/pipeline.py` | options, training run, metrics and outputs |
+| `source/beziercurve.py`, `source/diffrasterizer.py` | Bézier curves → Gaussians → differentiable splatting |
+| `source/cliploss.py`, `source/metrics.py` | CLIPasso loss; evaluation |
+| `source/trainer.py`, `source/initalizer.py`, `source/pruning.py` | training loop, visual-hull initialization, respawning |
+| `source/connectivity.py` | connectivity loss and weld |
+| `tools/` | data download and rendering, sweeps, figures, website export |
 
-
-#### The duck 
-
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/duck_002.gif" width="200px"><br>Model w/ 0.02 Thickness</td>
-    <td align="center"><img src="assets/duck_004.gif" width="200px"><br>Model w/ 0.04 Thickness</td>
-    <td align="center"><img src="assets/duck_gt.gif" width="200px"><br>Ground Truth Scene</td>
-  </tr>
-</table>
-</table>
-
+3D models from [Objaverse](https://objaverse.allenai.org/), CC-BY/CC0; authors are listed in
+`meshes/objaverse_selection.json`. Developed for EPFL CS-503 *Visual Intelligence: Machines and Minds*.

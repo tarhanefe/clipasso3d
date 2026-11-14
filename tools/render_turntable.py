@@ -45,8 +45,7 @@ def main():
     rm.normalize_to_unit_sphere(meshes)
     cam = rm.setup_render(args)
     scene = bpy.context.scene
-    scene.view_layers[0].use_pass_position = False
-    rm.set_output_format(scene, "png")
+    rm.set_png_output(scene)
 
     dist = args.margin / math.sin(0.5 * args.fov)
     el = math.radians(args.elevation)

@@ -3,17 +3,14 @@ Render a mesh (.glb/.gltf/.obj/.fbx/.ply/.stl) into a NeRF-style dataset that th
 training pipeline reads directly:
 
     <out>/transforms_{train,val,test}.json   camera_angle_x + per-frame c2w (Blender/OpenGL convention)
-    <out>/rgb/{split}/r_{i}.png              RGBA, transparent background
-    <out>/world_pos/{split}/r_{i}.exr        RGBA float: world xyz of the surface seen by each pixel, A = coverage
+    <out>/rgb/{split}/r_{i}.png              RGBA, transparent background (alpha = object mask)
     <out>/surface_points.npy                 (N,3) points sampled on the normalized mesh surface (for 3D metrics)
 
 The mesh is translated and scaled so that its bounding sphere is the unit sphere at the
 origin, and cameras look at the origin from a distance that keeps the whole sphere in view.
 
 Run with Blender (no GUI needed):
-    blender -b -P tools/render_mesh.py -- --mesh assets/chair.glb --out data/chair
-or with the `bpy` pip module:
-    python tools/render_mesh.py --mesh assets/chair.glb --out data/chair
+    blender -b -P tools/render_mesh.py -- --mesh meshes/chair.glb --out data/chair
 """
 import argparse
 import json
@@ -140,7 +137,6 @@ def setup_render(args):
     scene.render.resolution_percentage = 100
     scene.render.film_transparent = True
     scene.view_settings.view_transform = "Standard"   # faithful colors (AgX/Filmic desaturate)
-    scene.view_layers[0].use_pass_position = True
 
     if args.device != "cpu":
         prefs = bpy.context.preferences.addons["cycles"].preferences
@@ -217,61 +213,18 @@ def camera_positions(n, dist, elev_min, elev_max, rng=None):
 
 # ---------------------------------------------------------------- output
 
-def read_position(exr_path):
-    """Read the Position pass from a multilayer EXR as (H,W,3) float32, top row first.
-    Blender 5 writes one EXR part per pass, older versions one part with all channels."""
-    import OpenImageIO as oiio
-    inp = oiio.ImageInput.open(exr_path)
-    if inp is None:
-        raise RuntimeError(oiio.geterror())
-    found, seen, sub = {}, [], 0
-    while inp.seek_subimage(sub, 0):
-        spec = inp.spec()
-        names = list(spec.channelnames)
-        seen += names
-        idx = {c.split(".")[-1]: k for k, c in enumerate(names) if c.split(".")[-2:-1] == ["Position"]}
-        if idx:
-            pix = inp.read_image(sub, 0, 0, spec.nchannels, oiio.FLOAT).reshape(spec.height, spec.width, spec.nchannels)
-            found = {a: pix[..., idx[a]] for a in "XYZ" if a in idx}
-            break
-        sub += 1
-    inp.close()
-    if len(found) != 3:
-        raise RuntimeError(f"No Position pass in {exr_path}: {seen}")
-    return np.stack([found["X"], found["Y"], found["Z"]], -1)
-
-
-def write_world_pos(path, xyz, alpha):
-    """Write (H,W,3) world positions and (H,W) coverage as a half-float RGBA EXR."""
-    import OpenImageIO as oiio
-    h, w = alpha.shape
-    data = np.concatenate([xyz * (alpha[..., None] > 0), alpha[..., None]], -1).astype(np.float32)
-    spec = oiio.ImageSpec(w, h, 4, oiio.HALF)
-    spec.attribute("compression", "zip")
-    out = oiio.ImageOutput.create(path)
-    out.open(path, spec)
-    out.write_image(data)
-    out.close()
-
-
-def set_output_format(scene, kind):
-    """PNG RGBA 8-bit, or multilayer float EXR (Blender 5 moved multilayer to media_type)."""
+def set_png_output(scene):
+    """PNG RGBA 8-bit (Blender 5 also needs the media type)."""
     st = scene.render.image_settings
-    if kind == "png":
-        if hasattr(st, "media_type"):
-            st.media_type = "IMAGE"
-        st.file_format, st.color_mode, st.color_depth = "PNG", "RGBA", "8"
-    else:
-        if hasattr(st, "media_type"):
-            st.media_type = "MULTI_LAYER_IMAGE"
-        st.file_format, st.color_depth = "OPEN_EXR_MULTILAYER", "32"
+    if hasattr(st, "media_type"):
+        st.media_type = "IMAGE"
+    st.file_format, st.color_mode, st.color_depth = "PNG", "RGBA", "8"
 
 
 def render_split(split, positions, cam, out_dir, args):
     scene = bpy.context.scene
     os.makedirs(os.path.join(out_dir, "rgb", split), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, "world_pos", split), exist_ok=True)
-    tmp_exr = os.path.join(out_dir, f".tmp_{split}.exr")
+    set_png_output(scene)
     frames = []
     for i, eye in enumerate(positions):
         c2w = look_at_c2w(eye)
@@ -279,19 +232,9 @@ def render_split(split, positions, cam, out_dir, args):
         bpy.context.view_layer.update()
         stem = f"r_{i}"
         png = os.path.join(out_dir, "rgb", split, stem + ".png")
-        wp = os.path.join(out_dir, "world_pos", split, stem + ".exr")
-        if not (os.path.exists(png) and os.path.exists(wp)):   # resumable
-            # write_still saves every enabled pass (incl. Position) into the multilayer EXR;
-            # the PNG comes from the same render result with the view transform applied
-            set_output_format(scene, "multilayer_exr")
-            scene.render.filepath = tmp_exr
+        if not os.path.exists(png):   # resumable
+            scene.render.filepath = png + ".tmp.png"
             bpy.ops.render.render(write_still=True)
-            set_output_format(scene, "png")
-            bpy.data.images["Render Result"].save_render(png + ".tmp.png", scene=scene)
-            xyz = read_position(tmp_exr)
-            alpha = read_alpha(png + ".tmp.png")
-            write_world_pos(wp + ".tmp.exr", xyz, alpha)
-            os.replace(wp + ".tmp.exr", wp)
             os.replace(png + ".tmp.png", png)
         frames.append({
             "file_path": f"{split}/{stem}",
@@ -300,18 +243,7 @@ def render_split(split, positions, cam, out_dir, args):
             "transform_matrix": c2w.tolist(),
         })
         print(f"[render_mesh] {split} {i + 1}/{len(positions)}", flush=True)
-    if os.path.exists(tmp_exr):
-        os.remove(tmp_exr)
     return frames
-
-
-def read_alpha(png_path):
-    import OpenImageIO as oiio
-    inp = oiio.ImageInput.open(png_path)
-    spec = inp.spec()
-    pix = inp.read_image(0, 0, 0, spec.nchannels, oiio.FLOAT).reshape(spec.height, spec.width, spec.nchannels)
-    inp.close()
-    return pix[..., 3] if spec.nchannels == 4 else np.ones(pix.shape[:2], np.float32)
 
 
 def main():

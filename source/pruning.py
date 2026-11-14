@@ -45,34 +45,6 @@ def curve_object_scores(curve_set, sampler, dilate: int = 2, view_frac: float = 
     return on_frac, length
 
 
-def rebuild_optimizer(optimizer, params):
-    """Same optimizer type and settings over `params`, keeping the state of params it already had."""
-    new = optimizer.__class__(params, **optimizer.defaults)
-    for p in params:
-        if p in optimizer.state:
-            new.state[p] = optimizer.state[p]
-    return new
-
-
-@torch.no_grad()
-def prune_curves(curve_set, optimizer, sampler, min_on_frac=0.5, min_length=0.005, min_curves=1):
-    """
-    Delete curves that lie off the object (outside the visual hull) or have collapsed.
-    Returns (new optimizer, number of curves removed, scores dict).
-    """
-    on_frac, length = curve_object_scores(curve_set, sampler)
-    keep = (on_frac >= min_on_frac) & (length >= min_length)
-    if keep.sum() < min_curves:                       # never delete everything: keep the best ones
-        keep = torch.zeros_like(keep)
-        keep[torch.argsort(on_frac, descending=True)[:min_curves]] = True
-    removed = int((~keep).sum())
-    if removed:
-        curve_set.keep_curves(keep.tolist())
-        optimizer = rebuild_optimizer(optimizer, list(curve_set.parameters()))
-    return optimizer, removed, {"on_frac_mean": on_frac.mean().item(), "n_off_object": int((on_frac < min_on_frac).sum()),
-                                "n_collapsed": int((length < min_length).sum())}
-
-
 @torch.no_grad()
 def respawn_curves(curve_set, optimizer, sampler, hull_surface, length, min_on_frac=0.5, min_length=0.005):
     """

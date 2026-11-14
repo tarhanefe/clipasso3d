@@ -1,9 +1,8 @@
 import torch
 import torch.nn.functional as F
 
-# CLIP image normalization (same constants as cliploss.py)
-CLIP_MEAN = (0.48145466, 0.4578275, 0.40821073)
-CLIP_STD = (0.26862954, 0.26130258, 0.27577711)
+# CLIP image normalization
+from source.cliploss import CLIP_MEAN, CLIP_STD
 
 
 @torch.no_grad()
@@ -68,20 +67,15 @@ def chamfer_to_surface(curve_points, surface_points, max_surface=20000, chunk=40
 
 
 @torch.no_grad()
-def evaluate_views(curve_set, rasterizer, sampler, clip_model, width, height, invert=False):
+def evaluate_views(curve_set, rasterizer, sampler, clip_model, width, height):
     """
-    CLIP similarity and silhouette precision on all views of `sampler` (mean over views).
-
-    The protocol is the same whatever the training style, so runs are comparable: the sketch
-    is drawn black on white and compared with the target composited on white. `invert` says
-    whether the sampler's targets are already on white (black_on_white training) or on black.
+    CLIP similarity and silhouette precision on all views of `sampler` (mean over views):
+    the sketch drawn black on white against the target composited on white.
     """
     coverage = render_views(curve_set, rasterizer, sampler, width, height)
     sketches = 1 - coverage.repeat(1, 3, 1, 1)
     masks = torch.cat(sampler.masks)
     targets = torch.cat(sampler.images)
-    if not invert:      # on black: c*a  ->  on white: c*a + (1 - a)
-        targets = (targets + (1 - masks)).clamp(0, 1)
     sim = clip_similarity(clip_model, sketches, targets)
     prec = silhouette_precision(coverage, masks)
     return {

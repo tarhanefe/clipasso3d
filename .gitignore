@@ -6,10 +6,6 @@ __pycache__/
 # C extensions
 *.so
 
-# Data
-/data/chair/
-/data/ficus/
-/notebooks/training_frames/
 # Distribution / packaging
 .Python
 build/
@@ -178,16 +174,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# User definitions 
-.data/
-training_frames
+# Editors
 .vscode/
-*.pkl
-# Meshes and rendered datasets (large; licenses need attribution, see meshes/README.md)
+# Meshes and rendered datasets (large; licensed by their authors, see README)
 /meshes/*
-!/meshes/README.md
 !/meshes/objaverse_selection.json
-/data/objaverse/
+/data/
 .DS_Store
 
 # Training runs and job lists (tools/sweep.py)

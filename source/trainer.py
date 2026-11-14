@@ -1,17 +1,17 @@
 import json
 import math
 import os
-import sys
 import random
 import time
-import torch
+
 import numpy as np
+import torch
 from PIL import Image
 
-sys.path.append("..")
 from source.imagesampler import ImageSampler
-from source.pruning import prune_curves, respawn_curves, rebuild_optimizer
 from source.initalizer import visual_hull
+from source.pruning import respawn_curves
+
 
 class Trainer:
     """
@@ -19,9 +19,9 @@ class Trainer:
 
     Restart-safe: with `ckpt_path` set, the curves, optimizer, losses and RNG states are
     saved atomically every `ckpt_every` batches and training resumes from that file. Each
-    batch appends a line to `log_path` (JSONL) that tools/status.py reads for progress/ETA.
-    `display_plots=True` keeps the live matplotlib view for notebooks. With `wandb_run`
-    (an active wandb run, see pipeline.py) the same entries and the frames go to Weights & Biases.
+    batch appends a line to `log_path` (JSONL) that tools/status.py reads for progress/ETA. With
+    `wandb_run` (an active wandb run, see pipeline.py) the same entries and the frames go to
+    Weights & Biases. Sketches are drawn black on white, like the targets.
     """
     def __init__(
         self,
@@ -40,13 +40,11 @@ class Trainer:
         save_dir: str,
         eval_interval: int = 100,
         device: str = "cuda",
-        display_plots: bool = True,
         ckpt_path: str = None,
         ckpt_every: int = 20,
         frame_every: int = 1,
         log_path: str = None,
         wandb_run=None,
-        invert: bool = False,
         prune_every: int = 0,
         prune_start: int = 0,
         prune_min_on_frac: float = 0.5,
@@ -58,7 +56,6 @@ class Trainer:
         early_stop_tol: float = 0.005,
         min_batches: int = 0,
         snapshot_every: int = 0,
-        prune_mode: str = "delete",
         respawn_length: float = 0.15,
         prune_stop: int = 0,
     ):
@@ -79,22 +76,19 @@ class Trainer:
         if self.save_dir:
             os.makedirs(self.save_dir, exist_ok=True)
         self.eval_interval = eval_interval
-        self.display_plots = display_plots
         self.ckpt_path = ckpt_path
         self.ckpt_every = ckpt_every
         self.frame_every = frame_every
         self.log_path = log_path
         self.wandb_run = wandb_run
-        self.invert = invert    # True: black strokes on white (targets must be on white too)
-        # pruning: every `prune_every` batches from `prune_start` on, delete curves that lie
-        # outside the visual hull of the training masks or have collapsed (0 = off)
+        # respawning: every `prune_every` batches from `prune_start` on, curves that lie outside the
+        # visual hull of the training masks or have collapsed are moved back onto the hull (0 = off)
         self.prune_every = prune_every
         self.prune_start = prune_start
         self.prune_min_on_frac = prune_min_on_frac
         self.prune_min_length = prune_min_length
-        self.prune_mode = prune_mode            # "delete" or "respawn" (replace on the visual hull)
         self.respawn_length = respawn_length
-        self.prune_stop = prune_stop            # no pruning from this batch on (0 = never stop)
+        self.prune_stop = prune_stop            # no respawning from this batch on (0 = never stop)
         self._hull_surface = None
         # snapshots of all control points during training (for the interactive 4D viewer)
         self.n_snapshots = n_snapshots
@@ -164,13 +158,12 @@ class Trainer:
         if not (self.ckpt_path and os.path.exists(self.ckpt_path)):
             return 0
         state = torch.load(self.ckpt_path, map_location=self.device, weights_only=False)
-        self.curve_set.load_state_dict(state["curve_set"])      # also drops curves pruned before
+        self.curve_set.load_state_dict(state["curve_set"])
         self.curve_set.ids = list(state.get("curve_ids", self.curve_set.ids))
         self.snapshots = state.get("snapshots", [])
         self.best_val = state.get("best_val", float("inf"))
         self.bad_evals = state.get("bad_evals", 0)
         self.stopped_at = state.get("stopped_at")
-        self.optimizer = rebuild_optimizer(self.optimizer, list(self.curve_set.parameters()))
         self.optimizer.load_state_dict(state["optimizer"])
         self.batch_indices = state["batch_indices"]
         self.train_losses = state["train_losses"]
@@ -214,71 +207,15 @@ class Trainer:
         np.savez_compressed(tmp, batches=batches, offsets=offsets, ids=ids, P=P)
         os.replace(tmp, path)
 
-    def to_image(self, alpha):
-        """(H,W,1) stroke coverage -> (1,3,H,W) sketch image."""
-        img = alpha.permute(2, 0, 1).unsqueeze(0).repeat(1, 3, 1, 1)
-        return 1 - img if self.invert else img
+    @staticmethod
+    def to_image(alpha):
+        """(H,W,1) stroke coverage -> (1,3,H,W) black-on-white sketch image."""
+        return 1 - alpha.permute(2, 0, 1).unsqueeze(0).repeat(1, 3, 1, 1)
 
-    # ------------------------------------------------------------ display / frames
-
-    def _init_display(self):
-        import matplotlib.pyplot as plt
-        from matplotlib.gridspec import GridSpec
-
-        plt.ion()
-        self.fig = plt.figure(figsize=(8, 6))
-        gs = GridSpec(2, 2, figure=self.fig, height_ratios=[3, 1])
-        self.ax_r = self.fig.add_subplot(gs[0, 0])
-        self.ax_t = self.fig.add_subplot(gs[0, 1])
-        self.ax_m = self.fig.add_subplot(gs[1, :])
-
-        # init render image
-        blank = np.zeros((self.height, self.width, 3))
-        self.im_r = self.ax_r.imshow(blank, vmin=0, vmax=1)
-        self.ax_r.axis('off'); self.ax_r.set_title('Render')
-
-        # init target image
-        first, _, _ = self.train_sampler.sample(0)
-        target_img = first[0].permute(1, 2, 0).cpu().numpy()
-        self.im_t = self.ax_t.imshow(target_img, vmin=0, vmax=1)
-        self.ax_t.axis('off'); self.ax_t.set_title('Target')
-
-        # metrics subplot
-        self.ax_m.set_title('Loss Curves')
-        self.ax_m.set_xlabel('Batch')
-        self.ax_m.set_ylabel('Loss')
-        self.ax_m.grid(True)
-        plt.show(block=False)
-
-    def _update_display(self, render, target, status):
-        from IPython.display import clear_output, display
-
-        # update images
-        self.im_r.set_data(render[0].permute(1, 2, 0).detach().cpu().numpy())
-        self.im_t.set_data(target[0].permute(1, 2, 0).cpu().numpy())
-
-        # update metrics plot
-        self.ax_m.clear()
-        self.ax_m.plot(self.batch_indices, self.train_losses, label='Train')
-        if self.val_losses:
-            self.ax_m.plot(self.val_batches, self.val_losses, label='Val')
-        self.ax_m.set_title(status)
-        self.ax_m.set_xlabel('Batch')
-        self.ax_m.set_ylabel('Loss')
-        self.ax_m.legend()
-        self.ax_m.grid(True)
-
-        # redraw and display
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
-        clear_output(wait=True)
-        display(self.fig)
+    # ------------------------------------------------------------ frames
 
     def _save_frame(self, batch_idx, render, target):
         path = os.path.join(self.save_dir, f"batch_{batch_idx:04d}.png")
-        if self.display_plots:
-            self.fig.savefig(path)
-            return
         pair = torch.cat([render[0].detach(), target[0]], dim=2).clamp(0, 1)   # render | target
         arr = (pair.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
         Image.fromarray(arr).save(path + ".tmp.png")
@@ -290,9 +227,6 @@ class Trainer:
     # ------------------------------------------------------------ training
 
     def train(self):
-        if self.display_plots:
-            self._init_display()
-
         self.start_batch = self.resume()
         if self.snapshot_every and not self.snapshots:
             self.snapshot(0)                                    # initialization
@@ -320,8 +254,7 @@ class Trainer:
                     render = self.to_image(render)
                     if v == 0:
                         shown = render          # frames show view 0 next to its own target
-                    it = batch_idx * self.inner_steps
-                    losses.append(self.criterion(render, rgb, it))
+                    losses.append(self.criterion(render, rgb))
                 train_loss_tensor = torch.stack(losses).mean()
                 connect = None
                 if self.connect_loss is not None and batch_idx >= self.connect_start:
@@ -335,26 +268,19 @@ class Trainer:
             self.batch_indices.append(batch_idx)
             self.train_losses.append(train_loss)
 
-            # periodic pruning of curves off the object
+            # periodic respawning of curves off the object
             n_pruned = None
             if (self.prune_every and batch_idx >= self.prune_start
                     and (not self.prune_stop or batch_idx < self.prune_stop)
                     and (batch_idx - self.prune_start) % self.prune_every == 0):
-                if self.prune_mode == "respawn":
-                    if self._hull_surface is None:
-                        self._hull_surface = visual_hull(self.train_sampler)[1]
-                    self.optimizer, n_pruned, info = respawn_curves(
-                        self.curve_set, self.optimizer, self.train_sampler, self._hull_surface,
-                        self.respawn_length, self.prune_min_on_frac, self.prune_min_length)
-                    action = "respawned"
-                else:
-                    self.optimizer, n_pruned, info = prune_curves(
-                        self.curve_set, self.optimizer, self.train_sampler,
-                        self.prune_min_on_frac, self.prune_min_length)
-                    action = "removed"
-                print(f"Pruning at batch {batch_idx}: {action} {n_pruned}, {len(self.curve_set.curves)} curves "
+                if self._hull_surface is None:
+                    self._hull_surface = visual_hull(self.train_sampler)[1]
+                self.optimizer, n_pruned, info = respawn_curves(
+                    self.curve_set, self.optimizer, self.train_sampler, self._hull_surface,
+                    self.respawn_length, self.prune_min_on_frac, self.prune_min_length)
+                print(f"Respawning at batch {batch_idx}: {n_pruned} of {len(self.curve_set.curves)} curves "
                       f"({info['n_off_object']} off the object, {info['n_collapsed']} collapsed)", flush=True)
-                if n_pruned and self.prune_mode == "respawn":
+                if n_pruned:
                     self.bad_evals = 0      # new lines need time to train before the run may stop
 
             # periodic validation
@@ -368,9 +294,6 @@ class Trainer:
                 status = f"Batch {batch_idx}/{self.total_batches}: train_loss={train_loss:.4f}"
             print(status, flush=True)
 
-            # update display or save
-            if self.display_plots:
-                self._update_display(shown, batch[0][0], status)
             if self.save_dir and batch_idx % self.frame_every == 0:
                 self._save_frame(batch_idx, shown, batch[0][0])
 
@@ -416,7 +339,7 @@ class Trainer:
                 rgb, K, w2c = sampler.sample(idx)
                 render = self.rasterizer(means, thicknesses, w2c, K, self.width, self.height)
                 render = self.to_image(render)
-                loss = self.criterion(render, rgb, -1, mode="eval")
+                loss = self.criterion(render, rgb, mode="eval")
                 total_loss += loss.item()
         self.curve_set.train()
         return total_loss / count

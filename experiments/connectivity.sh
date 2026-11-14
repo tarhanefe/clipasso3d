@@ -15,8 +15,8 @@ if [ ${#OBJECTS[@]} -eq 0 ]; then
 fi
 WANDB=(--wandb --wandb_mode offline --wandb_entity efe-tarhan-epfl --wandb_project clipasso3d)
 STOP=(--epochs 600 --eval_interval 100 --early_stop_patience 5 --early_stop_tol 0.005 --min_batches 500)
-PRUNE=(--prune_mode respawn --prune_start 490 --prune_every 195 --prune_stop 2450)
-NORMAL=(--clip_conv_layer_weights 0 0 1 1 0 --clip_fc_loss_weight 0.1)
+PRUNE=(--prune_start 490 --prune_every 195 --prune_stop 2450)
+NORMAL=(--geometric_weight 1 --semantic_weight 0.1)
 COMMON=(--thickness 0.008 --snapshot_every 20 --frame_every 10 --gif_fps 30 --rotation_time 6 "${NORMAL[@]}" "${WANDB[@]}")
 LINES=(5 20 50 200)
 mkdir -p jobs/connect

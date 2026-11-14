@@ -19,8 +19,8 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from source.diffrasterizer import rasterize_spheres_sparse  # noqa: E402
-from tools.overlay import load_curves  # noqa: E402
+from source.beziercurve import CurveSet  # noqa: E402
+from source.diffrasterizer import rasterize_spheres  # noqa: E402
 
 LEVELS = ["too_geometric", "middle_geometric", "normal", "middle_abstract", "too_abstract"]
 LEVEL_LABELS = {"too_geometric": "geometric only, λ=0", "middle_geometric": "geometry-weighted, λ=0.02",
@@ -37,6 +37,17 @@ def font(size):
         return ImageFont.load_default(size=size)
     except TypeError:
         return ImageFont.load_default()
+
+
+def load_curves(run_dir, cfg):
+    """Latest curves of a run: the final curves.pt, else the training checkpoint."""
+    final = os.path.join(run_dir, "curves.pt")
+    if os.path.exists(final):
+        pts = torch.load(final, map_location="cpu", weights_only=False)["control_points"]
+    else:
+        state = torch.load(os.path.join(run_dir, "ckpt.pt"), map_location="cpu", weights_only=False)["curve_set"]
+        pts = [state[f"curves.{i}.P"] for i in range(len({k.split('.')[1] for k in state if k.startswith('curves.')}))]
+    return CurveSet(pts, cfg["thickness"], cfg.get("sample_spacing", 0.5), device="cpu")
 
 
 def intrinsics(fov, res):
@@ -61,7 +72,7 @@ def render_orbit(run_dir, c2ws, K, res, cell, zoom=1.0):
     means, th = curves()
     out = []
     for c2w in c2ws:
-        a = rasterize_spheres_sparse(means, th, torch.linalg.inv(c2w), K, res, res)[..., 0]
+        a = rasterize_spheres(means, th, torch.linalg.inv(c2w), K, res, res)[..., 0]
         img = zoom_crop(Image.fromarray(((1 - a.numpy()) * 255).astype(np.uint8)), zoom).resize((cell, cell), Image.LANCZOS)
         out.append(np.asarray(img))
     return np.stack(out), len(curves.curves)
